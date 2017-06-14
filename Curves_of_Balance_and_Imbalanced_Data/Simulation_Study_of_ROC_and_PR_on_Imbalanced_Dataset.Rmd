@@ -1,0 +1,171 @@
+---
+title: "Simulation Study of ROC and PR on Imbalanced Dataset"
+output: html_document
+---
+
+Data Simulation
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+# real binary outcomes
+real_value = c(rep(1, 1000), rep(0, 10000))
+real_value_reversed = c(rep(1, 10000), rep(0, 1000))
+# A and B have different distributions for real positives
+# classifier A: good early retrieval performance
+predicted_value_A = c(rbeta(300, 9, 2), rbeta(700, 2, 4), rbeta(10000, 2, 4))
+# classifier B:
+predicted_value_B = c(rbeta(600, 4, 3), rbeta(400, 3, 4), rbeta(10000, 2, 4))
+# classifier comparison:
+predicted_value_comparison = c(rbeta(1000, 4, 3), rbeta(10000, 2, 4))
+# perfect classifier
+predicted_value_perfect = c(rep(1, 1000), rep(0, 10000))
+# random classifier
+predicted_value_random = c(runif(11000, 0, 1))
+# C and D have different distribution for real negative case
+predicted_value_C = c(rbeta(1000, 4, 3), rbeta(5000, 1, 7), rbeta(5000, 4, 4))
+predicted_value_D = c(rbeta(1000, 4, 3), rbeta(5000, 3, 6), rbeta(5000, 3.5, 5))
+predicted_value_A_reversed = c(rbeta(3000, 9, 2), rbeta(7000, 2, 4), rbeta(1000, 2, 4))
+predicted_value_B_reversed = c(rbeta(6000, 4, 3), rbeta(4000, 3, 4), rbeta(1000, 2, 4))
+
+df <- cbind.data.frame(real_value, predicted_value_A, predicted_value_B)
+```
+
+Function of Binary Classification
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+library(ROCR)
+library(ggplot2)
+
+classification_result <- function (real, prediction){
+  
+pred <- prediction(prediction, real)
+perf <- performance(pred, measure = "tpr", x.measure = "fpr")
+# TPR
+tpr <- attr(perf, "y.values")[[1]]
+# FPR
+fpr <- attr(perf, "x.values")[[1]]
+# PR curve
+perf <- performance(pred, measure = "prec", x.measure = "rec")
+# precision
+precision <- attr(perf, "y.values")[[1]]
+# recall
+recall <- attr(perf, "x.values")[[1]]
+# mcc-f1
+perf <- performance(pred, measure = "mat", x.measure = "f")
+# mcc
+mcc <- attr(perf, "y.values")[[1]]
+# normalised mcc: [-1, 1] to [0, 1]
+mcc.nor <- (mcc + 1)/2
+# f score
+f <- attr(perf, "x.values")[[1]]   
+# auc
+auc <- attr(performance(pred, "auc"), "y.values")[[1]]
+
+output <-cbind.data.frame(tpr, fpr, precision, recall, mcc.nor, f, auc)
+  return(output)
+}
+tpr_index = 1
+fpr_index = 2
+precision_index = 3
+recall_index = 4 
+mcc.nor_index = 5 
+f_score_index = 6
+auc_index = 7
+
+```
+
+Plot funtion
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+# real is the real value(vector); 
+# prediction is the predictions of classifiers(dataset with multiple columns and each column stands for the prediction under a classifier)
+# metric_index is a two-element vector. the first element is the index of the metric that should be x axis, and the second element is the index of the metric that should be on y axis
+# model_name is a vector of the name of of the models
+# type_of_curve is a string. e.g "ROC"
+# x_axis is a string that is the label for x axis
+# y_axis is a string that is the label for y axis
+# positive_vs_negative is the proportion of positive cases versus negative cases
+classification_plot <- function(real, prediction, metric_index, model_name, type_of_curve, x_axis, y_axis, positive_vs_negative){
+  num_of_classifiers = ncol(prediction)
+  list_of_metrics = list()
+  num = 1
+  while (num <= num_of_classifiers){
+    metrics <- classification_result(real, prediction[, num])
+    list_of_metrics[[length(list_of_metrics) + 1]] <- metrics
+    num = num + 1
+  }
+  
+  x_value <- c()
+  y_value <- c()
+  length_of_metrics <- c()
+  num = 1
+  while (num <= num_of_classifiers){
+    x_value <- c(x_value, list_of_metrics[[num]][, metric_index[1]])
+    y_value <- c(y_value, list_of_metrics[[num]][, metric_index[2]])
+    length_of_metrics <- c(length_of_metrics, length(list_of_metrics[[num]][, metric_index[1]]))
+    num = num + 1
+  }
+  
+  df <- data.frame(X = x_value, Y= y_value, model = rep(model_name, times = length_of_metrics))
+  
+  ggplot(df, aes(x=X, y=Y, group = model, color = model, ymin=0, ymax=1, xmin=0, xmax=1 )) + geom_point(size = 0.2, shape = 21, fill="white")+
+  ggtitle(paste(type_of_curve, " Curve for different classifiers on \ndata set with positive versus negative " , positive_vs_negative )) + 
+  theme(plot.title=element_text(hjust=0.5))+
+    labs(x=x_axis, y=y_axis)
+  
+}
+
+
+
+```
+
+
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+real = real_value
+prediction = cbind(predicted_value_A, predicted_value_B, predicted_value_perfect, predicted_value_random, predicted_value_comparison)
+model_name= c("type A", "type B", "perfect", "random", "comparison")
+
+# ROC 
+classification_plot(real, prediction, c(fpr_index, tpr_index), model_name, "ROC", "FPR", "TPR","1000:10000")
+# PR
+classification_plot(real, prediction, c(recall_index, precision_index), model_name,  "PR", "Recall", "Precision","1000:10000")
+# mcc-f1
+classification_plot(real, prediction, c(f_score_index, mcc.nor_index), model_name,  "mcc-f1", "F1", "MCC", "1000:10000")
+# mcc-precision
+classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_name, "mcc-precision", "Precision", "MCC", "1000:10000")
+# mcc-recall
+classification_plot(real, prediction, c(recall_index, mcc.nor_index), model_name, "mcc-recall", "Recall", "MCC", "1000:10000")
+```
+
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+real = real_value
+prediction = cbind(predicted_value_C, predicted_value_D, predicted_value_perfect, predicted_value_random)
+model_name= c("type C", "type D", "perfect", "random")
+
+# ROC 
+classification_plot(real, prediction, c(fpr_index, tpr_index), model_name, "ROC", "FPR", "TPR","1000:10000")
+# PR
+classification_plot(real, prediction, c(recall_index, precision_index), model_name,  "PR", "Recall", "Precision","1000:10000")
+# mcc-f1
+classification_plot(real, prediction, c(f_score_index, mcc.nor_index), model_name,  "mcc-f1", "F1", "MCC", "1000:10000")
+# mcc-precision
+classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_name, "mcc-precision", "Precision", "MCC", "1000:10000")
+# mcc-recall
+classification_plot(real, prediction, c(recall_index, mcc.nor_index), model_name, "mcc-recall", "Recall", "MCC", "1000:10000")
+```
+
+
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+real = real_value_reversed
+prediction = cbind(predicted_value_A_reversed, predicted_value_B_reversed, predicted_value_random)
+model_name= c("type A", "type B", "Random")
+
+# ROC 
+classification_plot(real, prediction, c(fpr_index, tpr_index), model_name, "ROC", "FRR", "TPR", "10000:1000")
+# PR
+classification_plot(real, prediction, c(recall_index, precision_index), model_name, "PR", "Recall", "Precision", "10000:1000" )
+# mcc-f1
+classification_plot(real, prediction, c(f_score_index, mcc.nor_index), model_name, "mcc-f1", "F1", "MCC",  "10000:1000")
+# mcc-precision
+classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_name, "mcc-precision","Precision", "MCC", "10000:1000")
+# mcc-recall
+classification_plot(real, prediction, c(recall_index, mcc.nor_index), model_name, "mcc-recall", "Recall", "MCC", "10000:1000")
+```
+
+
