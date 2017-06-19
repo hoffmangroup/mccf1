@@ -58,7 +58,46 @@ f <- attr(perf, "x.values")[[1]]
 # auc
 auc <- attr(performance(pred, "auc"), "y.values")[[1]]
 
-output <-cbind.data.frame(tpr, fpr, precision, recall, mcc.nor, f, auc)
+
+# measure(metric) of mcc-f1: auc*(1-d)
+
+# get the last f score
+f.cp = 2/(2+(length(real[real==0])/length(real[real==1])))
+f.cp <- max(f[f < f.cp], na.rm = T)
+# get the largest f score
+f.max = max(f, na.rm = T)
+
+x_lower <- sort(f[c(1: (match(f.max, f)-1))], decreasing = F, na.last = F)
+x_lower[1] <- 0
+x_higher <- sort(f[c(1: match(f.max, f))], decreasing = F)
+
+# find corresponding mcc.nor
+y_higher.index <- match(x_higher, f)
+y_higher <- mcc.nor[y_higher.index]
+y_lower <- c(0.5,y_higher)
+y_lower <- y_lower[-length(y_lower)]
+
+# auc1
+auc1 <- sum(0.5*(x_higher - x_lower) *(y_lower + y_higher))
+
+x1 <- sort(f[c(match(f.max, f):length(f))], decreasing = F)
+x1_lower <- x1[c(1: length(x1)-1)]
+x1_higher <- x1[c(2: length(x1))]
+y1_higher.index <- match(f.max, f) -1 + match(x1_higher, f[c(match(f.max, f):length(f))])
+
+y1_higher <- mcc.nor[y1_higher.index]
+# auc2
+auc2 <- sum((x1_higher-x1_lower)*y1_higher)
+
+# auc of mcc-f1
+mcc_auc <- auc1 - f.cp*0.5 -auc2
+# smallest distance to (1, 1)
+distance <- sqrt(((1-mcc.nor)^2+(1-f)^2))
+min_distance <- min(distance, na.rm = T)
+# mcc-f1 measure
+mcc_measure <- sqrt(2)*mcc_auc*(sqrt(2)-min_distance)
+
+output <-cbind.data.frame(tpr, fpr, precision, recall, mcc.nor, f, auc, mcc_measure)
   return(output)
 }
 tpr_index = 1
@@ -68,11 +107,13 @@ recall_index = 4
 mcc.nor_index = 5 
 f_score_index = 6
 auc_index = 7
+mcc_measure_index = 8
 
 ```
 
 Plot funtion
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+
 # real is the real value(vector); 
 # prediction is the predictions of classifiers(dataset with multiple columns and each column stands for the prediction under a classifier)
 # metric_index is a two-element vector. the first element is the index of the metric that should be x axis, and the second element is the index of the metric that should be on y axis
@@ -91,6 +132,10 @@ classification_plot <- function(real, prediction, metric_index, model_name, type
     num = num + 1
   }
   
+  
+  
+  # we don't have auc metric
+  if (length(metric_index) == 2){
   x_value <- c()
   y_value <- c()
   length_of_metrics <- c()
@@ -100,16 +145,44 @@ classification_plot <- function(real, prediction, metric_index, model_name, type
     y_value <- c(y_value, list_of_metrics[[num]][, metric_index[2]])
     length_of_metrics <- c(length_of_metrics, length(list_of_metrics[[num]][, metric_index[1]]))
     num = num + 1
+
   }
-  
   df <- data.frame(X = x_value, Y= y_value, model = rep(model_name, times = length_of_metrics))
-  
+
+
   ggplot(df, aes(x=X, y=Y, group = model, color = model, ymin=0, ymax=1, xmin=0, xmax=1 )) + geom_point(size = 0.2, shape = 21, fill="white")+
-  ggtitle(paste(type_of_curve, " Curve for different classifiers on \ndata set with positive versus negative " , positive_vs_negative )) + 
-  theme(plot.title=element_text(hjust=0.5))+
-    labs(x=x_axis, y=y_axis)
-  
+  ggtitle(paste(type_of_curve, " Curve for different classifiers on \ndata set with positive versus negative" , positive_vs_negative)) +
+  theme(plot.title=element_text(hjust=0.5))+ labs(x=x_axis, y=y_axis)
+
 }
+
+
+  # we have auc metric
+ else if (length(metric_index) == 3){
+  x_value <- c()
+  y_value <- c()
+  auc_metric <- c()
+  length_of_metrics <- c()
+  num = 1
+  while (num <= num_of_classifiers){
+    x_value <- c(x_value, list_of_metrics[[num]][, metric_index[1]])
+    y_value <- c(y_value, list_of_metrics[[num]][, metric_index[2]])
+    auc_metric <- c(auc_metric, list_of_metrics[[num]][,metric_index[3]])
+    length_of_metrics <- c(length_of_metrics, length(list_of_metrics[[num]][, metric_index[1]]))
+    num = num + 1
+
+  }
+  df <- data.frame(X = x_value, Y= y_value, measure = auc_metric, model = rep(model_name, times = length_of_metrics))
+  df$model_and_measure <- paste(df$model, df$measure)
+
+
+  ggplot(df, aes(x=X, y=Y, group = model_and_measure, color = model_and_measure,ymin=0, ymax=1, xmin=0, xmax=1 )) + geom_point(size = 0.2, shape = 21, fill="white")+
+  ggtitle(paste(type_of_curve, " Curve for different classifiers on \ndata set with positive versus negative" , positive_vs_negative)) +
+  theme(plot.title=element_text(hjust=0.5))+ labs(x=x_axis, y=y_axis)
+    
+  }
+}
+
 
 
 
@@ -118,15 +191,15 @@ classification_plot <- function(real, prediction, metric_index, model_name, type
 
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
 real = real_value
-prediction = cbind(predicted_value_A, predicted_value_B, predicted_value_perfect, predicted_value_random, predicted_value_comparison)
-model_name= c("type A", "type B", "perfect", "random", "comparison")
+prediction = cbind(predicted_value_A, predicted_value_B, predicted_value_perfect, predicted_value_random)
+model_name= c("type A", "type B", "perfect", "random")
 
 # ROC 
-classification_plot(real, prediction, c(fpr_index, tpr_index), model_name, "ROC", "FPR", "TPR","1000:10000")
+classification_plot(real, prediction, c(fpr_index, tpr_index, auc_index), model_name, "ROC", "FPR", "TPR","1000:10000")
 # PR
 classification_plot(real, prediction, c(recall_index, precision_index), model_name,  "PR", "Recall", "Precision","1000:10000")
 # mcc-f1
-classification_plot(real, prediction, c(f_score_index, mcc.nor_index), model_name,  "mcc-f1", "F1", "MCC", "1000:10000")
+classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name,  "mcc-f1", "F1", "MCC", "1000:10000")
 # mcc-precision
 classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_name, "mcc-precision", "Precision", "MCC", "1000:10000")
 # mcc-recall
@@ -139,11 +212,11 @@ prediction = cbind(predicted_value_C, predicted_value_D, predicted_value_perfect
 model_name= c("type C", "type D", "perfect", "random")
 
 # ROC 
-classification_plot(real, prediction, c(fpr_index, tpr_index), model_name, "ROC", "FPR", "TPR","1000:10000")
+classification_plot(real, prediction, c(fpr_index, tpr_index, auc_index), model_name, "ROC", "FPR", "TPR","1000:10000")
 # PR
 classification_plot(real, prediction, c(recall_index, precision_index), model_name,  "PR", "Recall", "Precision","1000:10000")
 # mcc-f1
-classification_plot(real, prediction, c(f_score_index, mcc.nor_index), model_name,  "mcc-f1", "F1", "MCC", "1000:10000")
+classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name,  "mcc-f1", "F1", "MCC", "1000:10000")
 # mcc-precision
 classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_name, "mcc-precision", "Precision", "MCC", "1000:10000")
 # mcc-recall
@@ -157,15 +230,30 @@ prediction = cbind(predicted_value_A_reversed, predicted_value_B_reversed, predi
 model_name= c("type A", "type B", "Random")
 
 # ROC 
-classification_plot(real, prediction, c(fpr_index, tpr_index), model_name, "ROC", "FRR", "TPR", "10000:1000")
+classification_plot(real, prediction, c(fpr_index, tpr_index, auc_index), model_name, "ROC", "FRR", "TPR", "10000:1000")
 # PR
 classification_plot(real, prediction, c(recall_index, precision_index), model_name, "PR", "Recall", "Precision", "10000:1000" )
 # mcc-f1
-classification_plot(real, prediction, c(f_score_index, mcc.nor_index), model_name, "mcc-f1", "F1", "MCC",  "10000:1000")
+classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name, "mcc-f1", "F1", "MCC",  "10000:1000")
 # mcc-precision
 classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_name, "mcc-precision","Precision", "MCC", "10000:1000")
 # mcc-recall
 classification_plot(real, prediction, c(recall_index, mcc.nor_index), model_name, "mcc-recall", "Recall", "MCC", "10000:1000")
 ```
 
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+real = real_value
+predicted_value_4 = c(rbeta(350, 15, 0.5), rbeta(650, 2.25, 4), rbeta(10000, 2, 4))
+predicted_value_5 = c(rbeta(400, 3.3, 3), rbeta(600, 3, 4), rbeta(10000, 2, 4))
+predicted_value_6 = c(rbeta(400, 3.3, 3), rbeta(600, 3, 4), rbeta(4550, 1, 10), rbeta(5450, 4, 4.5))
+prediction = cbind(predicted_value_4, predicted_value_5, predicted_value_6)
+model_name= c("type 4", "type 5", "type 6")
+
+# ROC 
+classification_plot(real, prediction, c(fpr_index, tpr_index, auc_index), model_name, "ROC", "FRR", "TPR", "1000:10000")
+# PR
+classification_plot(real, prediction, c(recall_index, precision_index), model_name, "PR", "Recall", "Precision", "1000:10000" )
+# mcc-f1
+classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name, "mcc-f1", "F1", "MCC",  "1000:10000")
+```
 

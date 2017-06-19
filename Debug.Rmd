@@ -6,26 +6,6 @@ output: html_document
 
 
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
-real = real_value
-prediction = cbind(predicted_value_A, predicted_value_B)
-model_name= c("type A", "type B")
-
-num_of_classifiers = ncol(prediction)
-  list_of_metrics = list()
-  
-  for (num in num_of_classifiers){
-    metrics <- classification_result(real, prediction[, num])
-    list_of_metrics[[length(list_of_metrics) + 1]] <- metrics
-  }
-  
-  x_value <- c()
-  y_value <- c()
-  length_of_metrics <- c()
-  for (num in num_of_classifiers){
-    x_value <- c(x_value, list_of_metrics[[num]][, metric_index[1]])
-    y_value <- c(y_value, list_of_metrics[[num]][, metric_index[2]])
-    length_of_metrics <- c(length_of_metrics, length(list_of_metrics[[num]][, metric_index[1]]))
-  }
-  
-  df <- data.frame(X = x_value, Y= y_value, model = rep(model_name, times = length_of_metrics))
+predicted_value_1 = c(rbeta(2000, 10, 1.5), rbeta(3000, 2, 4), rbeta(negative_num, 2, 4))
+real_value = c(rep(1, positive_num), rep(0, negative_num))
 ```
