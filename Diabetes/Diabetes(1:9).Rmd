@@ -1,0 +1,325 @@
+---
+title: "Comparison between ROC, PR and MCC-F1 curves with unbalanced Diabetes data(1:9)"
+---
+
+Prepare 9:1 data set
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+fdata = read.table("/users/ccao/Downloads/Data/diabetes.data", sep=",")
+
+fdata_1 = fdata[which(fdata$V9==1),]
+fdata_0 = fdata[which(fdata$V9==0),]
+
+fdata1 <- fdata_1[sample(nrow(fdata_1), 20),]
+fdata0 <- fdata_0[sample(nrow(fdata_0), 180),]
+
+train <- rbind(fdata0[1:90,], fdata1[1:10,])
+test <- rbind(fdata0[91:180,], fdata1[11:20,])
+xtrain_std = scale(train[, 1:8])
+ytrain_std = as.factor(train[,9])
+trmu = apply(train[,1:8], 2, mean)
+trsd = apply(train[,1:8], 2, sd)
+xtest_std = scale(test[, 1:8], center = trmu, scale = trsd)
+ytest_std = as.factor(test[,9])
+
+xtrain_log = as.matrix(log(train[,1:8]+0.5))
+ytrain_log = as.factor(train[,9])
+xtest_log = as.matrix(log(test[,1:8]+0.5))
+ytest_log = as.factor(test[,9])
+```
+
+
+\textcolor{blue}{LASSO classifier}
+
+Model Fitting
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+library(glmnet)
+cvstd <- cv.glmnet(xtrain_std, ytrain_std, family="binomial", alpha = 0, nfolds = 10, type.measure = "class")
+lamstd = cvstd$lambda.min
+std_rlogit <- glmnet(xtrain_std, ytrain_std, family = "binomial", alpha=0)
+std_predtest <- predict(std_rlogit, xtest_std, type="class", s=lamstd)
+cfm_test <- table(std_predtest, ytest_std)
+```
+
+ROC curve--LASSO
+================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+library(ROCR)
+library(ggplot2)
+std_probtest <- predict(std_rlogit, xtest_std, type = "response", s = lamstd)
+std_predresp <- prediction(std_probtest, ytest_std)
+perf_std <- performance(std_predresp, measure = "tpr", x.measure = "fpr")
+
+# TPR
+tpr.ptstd <- attr(perf_std, "y.values")[[1]]
+# FPR
+fpr.ptstd <- attr(perf_std, "x.values")[[1]]
+# AUC
+auc.std <- attr(performance(std_predresp, "auc"), "y.values")[[1]]
+auc1 <- signif(auc.std, digit=3)
+
+roc.std <- data.frame(FPR=fpr.ptstd, TPR=tpr.ptstd, model="GLM-Ridge")
+
+ggplot(roc.std, aes(x=FPR, y=TPR, ymin=0, ymax=TPR)) + geom_point() +
+  geom_ribbon(alpha=0.2)+
+  geom_abline(intercept=0, slope=1, lty=2)+
+  ggtitle(paste0("ROC Curve for Standarized Data with AUC=", auc1))+
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+PR curve--LASSO
+===============
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+perf_std.pr <- performance(std_predresp, measure = "prec", x.measure="rec")
+
+# PR curve
+# precision
+precision <- attr(perf_std.pr, "y.values")[[1]]
+# recall
+recall <- attr(perf_std.pr, "x.values")[[1]]
+
+pr.std <- data.frame(Precision= precision, Recall = recall, model="GLM-LASSO")
+
+ggplot(pr.std, aes(x=Recall, y=Precision, ymin=0, ymax=Precision)) + geom_point() +
+  geom_ribbon(alpha=0.2)+
+  ggtitle(paste("PR Curve for Standardized Data with AUC=", "undetermined")) + 
+  theme(plot.title=element_text(hjust=0.5))
+
+```
+
+MCC-F1--LASSO
+=============
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+perf_std.new <- performance(std_predresp, measure = "mat", x.measure = "f")
+
+# mcc
+mcc.ptstd <- attr(perf_std.new, "y.values")[[1]]
+# normalised mcc: [-1, 1] to [0, 1]
+mcc.nor <- (mcc.ptstd + 1)/2
+# f score
+f.ptstd <- attr(perf_std.new, "x.values")[[1]]   
+# threshold
+threshold <- attr(perf_std.new, "alpha.values")[[1]]
+
+# MCC-F1 Measure--LASSO
+# get the last f score
+f.cp = 2/(2+(length(ytest_std[ytest_std==0])/length(ytest_std[ytest_std==1])))
+# get the largest f score
+f.max = max(f.ptstd, na.rm = T)
+
+x_lower <- sort(f.ptstd[f.ptstd < f.cp], decreasing = F, na.last = F)
+x_lower[1] <- 0
+x_higher <- sort(f.ptstd[f.ptstd <= f.cp], decreasing = F)
+
+# find corresponding mcc.nor
+y_higher.index <- match(x_higher, f.ptstd)
+y_higher.index[length(y_higher.index)] <- y_higher.index[length(y_higher.index)- 1]
+y_higher <- mcc.nor[y_higher.index]
+
+auc1 <- sum((x_higher - x_lower) * y_higher)
+
+x1 <- sort(f.ptstd[c(match(f.max, f.ptstd):length(f.ptstd))], decreasing = F)
+x1_lower <- x1[c(1: length(x1)-1)]
+x1_higher <- x1[c(2: length(x1))]
+y1_higher.index <- match(f.max, f.ptstd) -1 + match(x1_higher, f.ptstd[c(match(f.max, f.ptstd):length(f.ptstd))])
+
+y1_higher <- mcc.nor[y1_higher.index]
+auc2 <- sum((x1_higher-x1_lower)*y1_higher)
+
+# measure
+auc1.mcc <- 1-(1*f.max-auc1-auc2)
+
+# mf stands for MCC-F_score curve
+mf.std <- data.frame(MCC.nor = mcc.nor, F_score = f.ptstd, model = "GLM-Ridge")
+
+ggplot(mf.std, aes(x=F_score, y=MCC.nor, ymin=0, ymax=1, xmin=0, xmax=1)) + geom_point()+
+  geom_abline(intercept=0.5, slope = 0, lty=2)+
+  ggtitle(paste("MCC-F_score Curve for Standardized Data with AUC=", auc1.mcc)) + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+
+
+\textcolor{blue}{Ridge Penalty--a different classifier}
+
+Model Fitting--RIDGE
+```{r,echo=F, eval=T,cache=T, message=F,warning=F,fig.height=4,fig.width=6}
+# using Ridge penalty
+cv.ridge <- cv.glmnet(xtrain_std, ytrain_std, alpha=0, family="binomial", nfolds=10, type.measure = "class")
+# optimal lambda
+lamstd.ridge = cv.ridge$lambda.min
+# prediction
+fit.ridge <- glmnet(xtrain_std, ytrain_std, alpha=0, family = "binomial")
+pred.ridge <- predict(fit.ridge, xtest_std, type="class", s = lamstd.ridge)
+```
+
+ROC curve--RIDGE
+================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F,fig.height=4,fig.width=6}
+std_probtest.ridge <- predict(fit.ridge, xtest_std, type="response", s=lamstd.ridge)
+std_predresp.ridge <- prediction(std_probtest.ridge, ytest_std)
+perf_std.ridge <- performance(std_predresp.ridge, measure = "tpr", x.measure = "fpr")
+# TPR
+tpr.ridge <- attr(perf_std.ridge, "y.values")[[1]]
+# FPR
+fpr.ridge <- attr(perf_std.ridge, "x.values")[[1]]
+# AUC
+auc.ridge <- attr(performance(std_predresp.ridge, "auc"), "y.values")[[1]]
+auc2 <- signif(auc.ridge, digits = 3)
+
+roc.ridge <- data.frame(FPR = fpr.ridge, TPR = tpr.ridge, model = "GLM-RIDGE")
+
+ggplot(roc.ridge, aes(x=FPR, y=TPR,ymin=0, ymax=TPR)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  geom_abline(intercept=0, slope = 1, lty=2)+
+  ggtitle(paste("ROC Curve for Standardized Data with AUC=", auc2)) + 
+  theme(plot.title=element_text(hjust=0.5))
+
+```
+
+PR Curve--RIDGE
+================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+# PR curve
+perf_std.ridge.pr <- performance(std_predresp.ridge, measure = "prec", x.measure = "rec")
+# precision
+precision.ridge <- attr(perf_std.ridge.pr, "y.values")[[1]]
+
+# recall
+recall.ridge <- attr(perf_std.ridge.pr, "x.values")[[1]]
+
+pr.ridge.std <- data.frame(Recall=recall.ridge, Precision = precision.ridge, model = "GLM-RIDGE")
+ggplot(pr.ridge.std, aes(x=Recall, y=Precision, ymin=0, ymax=Precision)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  ggtitle(paste("PR Curve for Standardized Data with AUC=", "undetermined")) + 
+  theme(plot.title=element_text(hjust=0.5))
+
+```
+
+MCC-F1--RIDGE
+=============
+```{r,echo=F, eval=T,cache=T, message=F,warning=F,fig.height=4,fig.width=6}
+perf_std.ridge.new <- performance(std_predresp.ridge, measure = "mat", x.measure = "f")
+perf_std.ridge.pr <- performance(std_predresp.ridge, measure = "prec", x.measure = "rec")
+# mcc
+mcc.ptstd.ridge <- attr(perf_std.ridge.new, "y.values")[[1]]
+# normalised mcc: [-1, 1] to [0, 1]
+mcc.nor.ridge <- (mcc.ptstd.ridge + 1)/2
+# f score
+f.ptstd.ridge <- attr(perf_std.ridge.new, "x.values")[[1]]  
+
+mf.std.ridge <- data.frame(MCC.nor.ridge = mcc.nor.ridge, F_score.ridge = f.ptstd.ridge, model = "GLM-RIDGE")
+
+# MCC-F1 Measure--RIDGE
+# get the last f score
+f.cp = 2/(2+(length(ytest_std[ytest_std==0])/length(ytest_std[ytest_std==1])))
+f.cp <- max(f.ptstd.ridge[f.ptstd.ridge < f.cp], na.rm = T)
+# get the largest f score
+f.max = max(f.ptstd.ridge, na.rm = T)
+
+x_lower <- sort(f.ptstd.ridge[f.ptstd.ridge < f.cp], decreasing = F, na.last = F)
+x_lower[1] <- 0
+x_higher <- sort(f.ptstd.ridge[f.ptstd.ridge <= f.cp], decreasing = F)
+
+# find corresponding mcc.nor
+y_higher.index <- match(x_higher, f.ptstd.ridge)
+y_higher.index[length(y_higher.index)] <- y_higher.index[length(y_higher.index)- 1]
+y_higher <- mcc.nor.ridge[y_higher.index]
+
+auc1 <- sum((x_higher - x_lower) * y_higher)
+
+x1 <- sort(f.ptstd.ridge[c(match(f.max, f.ptstd.ridge):length(f.ptstd.ridge))], decreasing = F)
+x1_lower <- x1[c(1: length(x1)-1)]
+x1_higher <- x1[c(2: length(x1))]
+y1_higher.index <- match(f.max, f.ptstd.ridge) -1 + match(x1_higher, f.ptstd.ridge[c(match(f.max, f.ptstd.ridge):length(f.ptstd.ridge))])
+
+y1_higher <- mcc.nor.ridge[y1_higher.index]
+auc2 <- sum((x1_higher-x1_lower)*y1_higher)
+
+# measure
+auc2.mcc <- 1-(1*f.max-auc1-auc2)
+
+ggplot(mf.std.ridge, aes(x=F_score.ridge, y=MCC.nor.ridge, ymin=0, ymax=1, xmin=0, xmax=1)) + geom_point()+
+  geom_abline(intercept=0.5, slope = 0, lty=2)+
+  ggtitle(paste("MCC-F_score Curve for Standardized Data with AUC=", auc2.mcc)) + 
+  theme(plot.title=element_text(hjust=0.5))
+
+```
+
+\newpage
+
+MCC-F1 Curve for different classifiers on the same graph
+```{r,echo=F, eval=T,cache=T,message=F,warning=F,fig.height=4,fig.width=6}
+df_comb = data.frame(MCC.nor.new = c(mcc.nor, mcc.nor.ridge), F_score.new = c(f.ptstd, f.ptstd.ridge) , model = rep(c("GLM-LASSO", "GLM-RIDGE"), each = length(mcc.nor)))
+
+ggplot(df_comb, aes(x=F_score.new, y=MCC.nor.new, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.5, shape = 21, fill="white")+
+  ggtitle("MCC-F_score Curve for two different classifiers") + 
+  theme(plot.title=element_text(hjust=0.5))
+  
+```
+
+
+\newpage
+
+
+```{r,echo=F, eval=F,cache=T, message=F,warning=F}
+# MCC-F1 Measure--LASSO
+# get the last f score
+f.cp = 2/(2+(length(ytest_std[ytest_std==0])/length(ytest_std[ytest_std==1])))
+# get the largest f score
+f.max = max(f.ptstd, na.rm = T)
+
+x_lower <- sort(f.ptstd[f.ptstd < f.cp], decreasing = F, na.last = F)
+x_lower[1] <- 0
+x_higher <- sort(f.ptstd[f.ptstd <= f.cp], decreasing = F)
+
+# find corresponding mcc.nor
+y_higher.index <- match(x_higher, f.ptstd)
+y_higher.index[length(y_higher.index)] <- y_higher.index[length(y_higher.index)- 1]
+y_higher <- mcc.nor[y_higher.index]
+
+auc1 <- sum((x_higher - x_lower) * y_higher)
+
+x1 <- sort(f.ptstd[c(match(f.max, f.ptstd):length(f.ptstd))], decreasing = F)
+x1_lower <- x1[c(1: length(x1)-1)]
+x1_higher <- x1[c(2: length(x1))]
+y1_higher.index <- match(f.max, f.ptstd) -1 + match(x1_higher, f.ptstd[c(match(f.max, f.ptstd):length(f.ptstd))])
+
+y1_higher <- mcc.nor[y1_higher.index]
+auc2 <- sum((x1_higher-x1_lower)*y1_higher)
+
+# measure
+1-(1*f.max-auc1-auc2)
+```
+
+
+```{r,echo=F, eval=T,cache=T,message=F,warning=F,fig.height=4,fig.width=6}
+# MCC-F1 Measure--RIDGE
+# get the last f score
+f.cp = 2/(2+(length(ytest_std[ytest_std==0])/length(ytest_std[ytest_std==1])))
+f.cp <- max(f.ptstd.ridge[f.ptstd.ridge < f.cp], na.rm = T)
+# get the largest f score
+f.max = max(f.ptstd.ridge, na.rm = T)
+
+x_lower <- sort(f.ptstd.ridge[f.ptstd.ridge < f.cp], decreasing = F, na.last = F)
+x_lower[1] <- 0
+x_higher <- sort(f.ptstd.ridge[f.ptstd.ridge <= f.cp], decreasing = F)
+
+# find corresponding mcc.nor
+y_higher.index <- match(x_higher, f.ptstd.ridge)
+y_higher.index[length(y_higher.index)] <- y_higher.index[length(y_higher.index)- 1]
+y_higher <- mcc.nor.ridge[y_higher.index]
+
+auc1 <- sum((x_higher - x_lower) * y_higher)
+
+x1 <- sort(f.ptstd.ridge[c(match(f.max, f.ptstd.ridge):length(f.ptstd.ridge))], decreasing = F)
+x1_lower <- x1[c(1: length(x1)-1)]
+x1_higher <- x1[c(2: length(x1))]
+y1_higher.index <- match(f.max, f.ptstd.ridge) -1 + match(x1_higher, f.ptstd.ridge[c(match(f.max, f.ptstd.ridge):length(f.ptstd.ridge))])
+
+y1_higher <- mcc.nor.ridge[y1_higher.index]
+auc2 <- sum((x1_higher-x1_lower)*y1_higher)
+
+# measure
+1-(1*f.max-auc1-auc2)
+```
