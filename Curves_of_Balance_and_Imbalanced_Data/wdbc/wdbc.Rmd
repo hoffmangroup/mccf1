@@ -1,0 +1,351 @@
+
+
+# 2) Replace all the "magic numbers" with variables with proper names
+# 3) Rename some variables with names more proper (e.g., mmg_blcd_ytest -> classifier_output)
+# 4) Add comments EVERYWHERE
+# 5) Create a folder on Google Drive and save all your code files
+
+
+
+---
+title: "Implementation of Curves on the Breast Cancer Data Set"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+Data preparation--Balanced
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+# wdbc: name of the dataset
+wdbc_data <- read.table("/users/ccao/Documents/LabNotebook/RMarkDown/Curves of Balanced and Imbalanced Data/wdbc/wdbc.data",sep = ",") 
+
+# select desired features
+desired_col_start_index = 1
+desired_col_end_index = 12
+wdbc_data <- wdbc_data[,desired_col_start_index:desired_col_end_index] 
+wdbc_data$y <- as.factor(ifelse(wdbc_data$V2=="B",0,1))
+col_index_of_binary_outcome = 13
+
+positive_class_size = 212
+
+wdbc_data_1 <- wdbc_data[wdbc_data$y == 1,]  # positive cases of the data set
+wdbc_data_0 <- wdbc_data[wdbc_data$y == 0,]  # negative cases of the data set
+# create balanced data set
+wdbc_data_blcd <- rbind(wdbc_data_1[sample(nrow(wdbc_data_1), positive_class_size),], wdbc_data_0[sample(nrow(wdbc_data_0), positive_class_size),])
+
+# Here we select the positive data instances and the negative data instances for the models
+
+# select half of the positive cases for training data
+row_interval_start_index_1st = 1 
+row_interval_end_index_1st = 106
+# select half of the negative cases for training data
+row_interval_start_index_2nd = 213
+row_interval_end_index_2nd = 318
+
+
+col_interval_start_index = 3 
+col_interval_end_index_full_model = 12 # select 10 features for the "full model" (12 = 3 + 10 -1)
+col_interval_end_index_medium_model = 7 # select 5 features for the "medium model" (7 = 3 + 5 - 1)
+col_interval_end_index_low_model = 4 # select 2 features for the "low model"(4 = 3 + 2 - 1)
+
+# "blcd"" stands for "balanced"
+wdbc_blcd_xtrain_full <- wdbc_data_blcd[c(row_interval_start_index_1st:row_interval_end_index_1st, row_interval_start_index_2nd:row_interval_end_index_2nd), col_interval_start_index:col_interval_end_index_full_model]    # full model training data before standarizing 
+wdbc_blcd_xtrain_m <- wdbc_data_blcd[c(row_interval_start_index_1st:row_interval_end_index_1st, row_interval_start_index_2nd:row_interval_end_index_2nd), col_interval_start_index:col_interval_end_index_medium_model] # medium model training data before standarizing 
+wdbc_blcd_xtrain_l <- wdbc_data_blcd[c(row_interval_start_index_1st:row_interval_end_index_1st, row_interval_start_index_2nd:row_interval_end_index_2nd), col_interval_start_index:col_interval_end_index_low_model] # low model training data before standarizing 
+wdbc_blcd_ytrain <- wdbc_data_blcd[c(row_interval_start_index_1st:row_interval_end_index_1st, row_interval_start_index_2nd:row_interval_end_index_2nd), col_index_of_binary_outcome] # binary outcome of training data
+
+num_of_features_full = 10 
+num_of_features_medium = 5
+num_of_features_low = 2
+mean <- sapply(wdbc_blcd_xtrain_full[, 1:num_of_features_full], mean)
+sd <- sapply(wdbc_blcd_xtrain_full[, 1:num_of_features_full], sd)
+
+# standarize training data
+wdbc_blcd_xtrain_full <- scale(wdbc_blcd_xtrain_full, center = T, scale = T)
+wdbc_blcd_xtrain_m <- scale(wdbc_blcd_xtrain_m, center = T, scale = T)
+wdbc_blcd_xtrain_l <- scale(wdbc_blcd_xtrain_l, center = T, scale = T)
+
+# select half of the positive cases for testing data
+row_interval_start_index_test_1st = 107
+row_interval_end_index_test_1st = 212
+# select half of the negative cases for testing data
+row_interval_start_index_test_2nd = 319
+row_interval_end_index_test_2nd = 424
+
+wdbc_blcd_xtest_full <- scale(wdbc_data_blcd[c(row_interval_start_index_test_1st:row_interval_end_index_test_1st, row_interval_start_index_test_2nd:row_interval_end_index_test_2nd), col_interval_start_index:col_interval_end_index_full_model], center = mean, scale = sd) # full model testing data after standarizing 
+wdbc_blcd_xtest_m <- scale(wdbc_data_blcd[c(row_interval_start_index_test_1st:row_interval_end_index_test_1st, row_interval_start_index_test_2nd:row_interval_end_index_test_2nd), col_interval_start_index:col_interval_end_index_medium_model], center = mean[1:num_of_features_medium], scale = sd[1:num_of_features_medium]) # medium model testing data after standarizing 
+wdbc_blcd_xtest_l <- scale(wdbc_data_blcd[c(row_interval_start_index_test_1st:row_interval_end_index_test_1st, row_interval_start_index_test_2nd:row_interval_end_index_test_2nd), col_interval_start_index:col_interval_end_index_low_model], center = mean[1:num_of_features_low], scale = sd[1:num_of_features_low]) # low model testing data after standarizing 
+wdbc_blcd_ytest <- wdbc_data_blcd[c(row_interval_start_index_test_1st:row_interval_end_index_test_1st, row_interval_start_index_test_2nd:row_interval_end_index_test_2nd), col_index_of_binary_outcome] # binary outcome of testing data
+                         
+```
+
+Data preparation--Imbalanced
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+# Create imbalanced data set(positive:negative=1:9) from the original data set
+positive_class_size = 40
+negative_class_size = 357
+wdbc_data_iblcd <- rbind(wdbc_data_1[sample(nrow(wdbc_data_1), positive_class_size),], wdbc_data_0[sample(nrow(wdbc_data_0), negative_class_size),])
+
+# Here we select the positive data instances and the negative data instances for the models 
+
+# select half of the positive cases for training data
+row_interval_start_index_1st = 1 
+row_interval_end_index_1st = 20
+# select half of the negative cases for training data
+row_interval_start_index_2nd = 41
+row_interval_end_index_2nd = 218
+
+
+col_interval_start_index = 3 
+col_interval_end_index_full_model = 12
+col_interval_end_index_medium_model = 7
+col_interval_end_index_low_model = 4
+
+# "iblcd" stands for "imbalanced"
+wdbc_iblcd_xtrain_full <- wdbc_data_blcd[c(row_interval_start_index_1st:row_interval_end_index_1st, row_interval_start_index_2nd:row_interval_end_index_2nd), col_interval_start_index:col_interval_end_index_full_model] # full model training data before standarizing
+wdbc_iblcd_xtrain_m <- wdbc_data_blcd[c(row_interval_start_index_1st:row_interval_end_index_1st, row_interval_start_index_2nd:row_interval_end_index_2nd), col_interval_start_index:col_interval_end_index_medium_model] # medium model training data before standarizing
+wdbc_iblcd_xtrain_l <- wdbc_data_blcd[c(row_interval_start_index_1st:row_interval_end_index_1st, row_interval_start_index_2nd:row_interval_end_index_2nd), col_interval_start_index:col_interval_end_index_low_model] # low model training data before standarizing
+wdbc_iblcd_ytrain <- wdbc_data_blcd[c(row_interval_start_index_1st:row_interval_end_index_1st, row_interval_start_index_2nd:row_interval_end_index_2nd), col_index_of_binary_outcome] # binary outcome of training data 
+
+mean <- sapply(wdbc_iblcd_xtrain_full[, 1:num_of_features_full], mean)
+sd <- sapply(wdbc_iblcd_xtrain_full[, 1:num_of_features_full], sd)
+
+# standarizing training data
+wdbc_iblcd_xtrain_full <- scale(wdbc_iblcd_xtrain_full, center = T, scale = T)
+wdbc_iblcd_xtrain_m <- scale(wdbc_iblcd_xtrain_m, center = T, scale = T)
+wdbc_iblcd_xtrain_l <- scale(wdbc_iblcd_xtrain_l, center = T, scale = T)
+
+# select half of the positive cases for testing data
+row_interval_start_index_test_1st = 21
+row_interval_end_index_test_1st = 40
+# select half of the negative cases for testing data
+row_interval_start_index_test_2nd = 219
+row_interval_end_index_test_2nd = 397
+
+wdbc_iblcd_xtest_full <- scale(wdbc_data_iblcd[c(row_interval_start_index_test_1st:row_interval_end_index_test_1st, row_interval_start_index_test_2nd:row_interval_end_index_test_2nd), col_interval_start_index:col_interval_end_index_full_model], center = mean, scale = sd) # full model testing data after standarizing 
+wdbc_iblcd_xtest_m <- scale(wdbc_data_iblcd[c(row_interval_start_index_test_1st:row_interval_end_index_test_1st, row_interval_start_index_test_2nd:row_interval_end_index_test_2nd), col_interval_start_index:col_interval_end_index_medium_model], center = mean[1:num_of_features_medium], scale = sd[1:num_of_features_medium]) # medium model testing data after standarizing 
+wdbc_iblcd_xtest_l <- scale(wdbc_data_iblcd[c(row_interval_start_index_test_1st:row_interval_end_index_test_1st, row_interval_start_index_test_2nd:row_interval_end_index_test_2nd), col_interval_start_index:col_interval_end_index_low_model], center = mean[1:num_of_features_low], scale = sd[1:num_of_features_low]) # low model testing data after standarizing 
+wdbc_iblcd_ytest <- wdbc_data_iblcd[c(row_interval_start_index_test_1st:row_interval_end_index_test_1st, row_interval_start_index_test_2nd:row_interval_end_index_test_2nd), col_index_of_binary_outcome] # binary outcome of testing data
+                         
+```
+
+\textcolor{blue}{Function--LASSO}
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+library(glmnet)
+library(ROCR)
+library(ggplot2)
+# this function fits logistic model(LASSO penalty) based on training data set, and then generates the performance of prediction(tpr, fpr, precision, recall, mcc.nor, f1) as output   
+lasso_classifier <- function (trainx, trainy, testx, testy)
+{
+# fit in model  
+cv <- cv.glmnet(x = trainx, y = trainy, family = "binomial", alpha = 1, nfolds = 10, type.measure = "class")
+# optimal lambda from 10-fold cross-validation by lasso
+lamstd = cv$lambda.min
+
+fit <- glmnet(x = trainx, y = trainy, family = "binomial", alpha = 1)
+
+std_probtest <- predict(fit, testx, type="response", s=lamstd)
+std_predresp <- prediction(std_probtest, testy)
+
+# ROC curve
+perf_std <- performance(std_predresp, measure = "tpr", x.measure = "fpr")
+# TPR
+tpr <- attr(perf_std, "y.values")[[1]]
+# FPR
+fpr <- attr(perf_std, "x.values")[[1]]
+# PR curve
+perf_std <- performance(std_predresp, measure = "prec", x.measure = "rec")
+# precision
+precision <- attr(perf_std, "y.values")[[1]]
+# recall
+recall <- attr(perf_std, "x.values")[[1]]
+# mcc-f1
+perf_std <- performance(std_predresp, measure = "mat", x.measure = "f")
+# mcc
+mcc <- attr(perf_std, "y.values")[[1]]
+# normalised mcc: [-1, 1] to [0, 1]
+mcc.nor <- (mcc + 1)/2
+# f score
+f <- attr(perf_std, "x.values")[[1]]   
+
+output <-cbind.data.frame(tpr, fpr, precision, recall, mcc.nor, f)
+  return(output)
+}
+```
+
+\textcolor{blue}{Function--RANDOM}
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+random_classifier <- function (testx, testy)
+{
+random_result <- runif(nrow(testx), min = 0, max=1)
+pred <- prediction(random_result,testy)
+perf <- performance(pred, measure = "tpr", x.measure = "fpr")
+# TPR
+tpr <- attr(perf, "y.values")[[1]]
+# FPR
+fpr <- attr(perf, "x.values")[[1]]
+# PR curve
+perf <- performance(pred, measure = "prec", x.measure = "rec")
+# precision
+precision <- attr(perf, "y.values")[[1]]
+# recall
+recall <- attr(perf, "x.values")[[1]]
+# mcc-f1
+perf <- performance(pred, measure = "mat", x.measure = "f")
+# mcc
+mcc <- attr(perf, "y.values")[[1]]
+# normalised mcc: [-1, 1] to [0, 1]
+mcc.nor <- (mcc + 1)/2
+# f score
+f <- attr(perf, "x.values")[[1]]   
+
+output <-cbind.data.frame(tpr, fpr, precision, recall, mcc.nor, f)
+  return(output)
+}
+```
+
+Fit Model-Balanced
+=============================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+# fit the full model
+lasso_full_result <- lasso_classifier(wdbc_blcd_xtrain_full, wdbc_blcd_ytrain, wdbc_blcd_xtest_full, wdbc_blcd_ytest)
+# fit the medium model
+lasso_medium_result <- lasso_classifier(wdbc_blcd_xtrain_m, wdbc_blcd_ytrain, wdbc_blcd_xtest_m, wdbc_blcd_ytest)
+# fit the low model
+lasso_low_result <- lasso_classifier(wdbc_blcd_xtrain_l, wdbc_blcd_ytrain, wdbc_blcd_xtest_l, wdbc_blcd_ytest)
+random_result <- random_classifier(wdbc_blcd_xtest_full, wdbc_blcd_ytest) 
+
+tpr_index = 1
+fpr_index = 2
+precision_index = 3
+recall_index = 4 
+mcc.nor_index = 5 
+f_score_index = 6
+```
+
+ROC-Balanced
+============
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+df_comb.roc = data.frame(TPR = c(lasso_full_result[,tpr_index], lasso_medium_result[,tpr_index], lasso_low_result[,tpr_index], random_result[,tpr_index] ), FPR = c(lasso_full_result[,fpr_index], lasso_medium_result[,fpr_index], lasso_low_result[,fpr_index], random_result[,fpr_index]) , model = rep(c("FULL","MEDIUM", "LOW", "RANDOM"), times = c(length(lasso_full_result[,tpr_index]), length(lasso_medium_result[,tpr_index]), length(lasso_low_result[,tpr_index]), length(random_result[,tpr_index]))))
+
+ggplot(df_comb.roc, aes(x=FPR, y=TPR, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white")+
+  ggtitle("ROC Curve for four different classifiers") + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+PR-Balanced
+===========
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+df_comb.pr = data.frame(Precision = c(lasso_full_result[,precision_index], lasso_medium_result[,precision_index], lasso_low_result[,precision_index], random_result[,precision_index]), Recall = c(lasso_full_result[,recall_index], lasso_medium_result[,recall_index], lasso_low_result[,recall_index], random_result[,recall_index]) , model = rep(c("FULL", "MEDIUM", "LOW", "RANDOM"), times = c(length(lasso_full_result[,precision_index]), length(lasso_medium_result[,precision_index]), length(lasso_low_result[,precision_index]), length(random_result[,precision_index]))))
+
+ggplot(df_comb.pr, aes(y=Precision, x=Recall, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white")+
+  ggtitle("PR Curve for four different classifiers") + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+MCC-F1-Balanced
+===============
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+df_comb.mf = data.frame(MCC = c(lasso_full_result[,mcc.nor_index], lasso_medium_result[,mcc.nor_index], lasso_low_result[,mcc.nor_index], random_result[,mcc.nor_index]), F_1 = c(lasso_full_result[,f_score_index], lasso_medium_result[,f_score_index], lasso_low_result[,f_score_index], random_result[,f_score_index]) , model = rep(c("FULL", "MEDIUM", "LOW", "RANDOM"), times = c(length(lasso_full_result[,mcc.nor_index]), length(lasso_medium_result[,mcc.nor_index]), length(lasso_low_result[,mcc.nor_index]), length(random_result[,mcc.nor_index]))))
+
+ggplot(df_comb.mf, aes(x=F_1, y=MCC, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white")+
+  ggtitle("MCC-F1 Curve for four different classifiers") + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+MCC-Precision-Balanced
+======================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+df_comb.mp = data.frame(MCC = c(lasso_full_result[,mcc.nor_index], lasso_medium_result[,mcc.nor_index], lasso_low_result[,mcc.nor_index], random_result[,mcc.nor_index]), Precision = c(lasso_full_result[,precision_index], lasso_medium_result[,precision_index], lasso_low_result[,precision_index], random_result[,precision_index]) , model = rep(c("FULL", "MEDIUM", "LOW", "RANDOM"), times = c(length(lasso_full_result[,mcc.nor_index]), length(lasso_medium_result[,mcc.nor_index]), length(lasso_low_result[,mcc.nor_index]), length(random_result[,mcc.nor_index]))))
+
+ggplot(df_comb.mp, aes(x=Precision, y=MCC, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white") +
+  ggtitle("MCC-Precision Curve for four different classifiers") + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+MCC-Recall-Imbalanced
+=====================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+df_comb.mp = data.frame(MCC = c(lasso_full_result[,mcc.nor_index], lasso_medium_result[,mcc.nor_index], lasso_low_result[,mcc.nor_index], random_result[,mcc.nor_index]), Recall = c(lasso_full_result[,recall_index], lasso_medium_result[,recall_index], lasso_low_result[,recall_index], random_result[,recall_index]) , model = rep(c("FULL", "MEDIUM", "LOW", "RANDOM"), times = c(length(lasso_full_result[,mcc.nor_index]), length(lasso_medium_result[,mcc.nor_index]), length(lasso_low_result[,mcc.nor_index]), length(random_result[,mcc.nor_index]))))
+
+ggplot(df_comb.mp, aes(x=Recall, y=MCC, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white") +
+  ggtitle("MCC-Recall Curve for four different classifiers") + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+Goodness of Fit Test-Imbalanced
+===============================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+# fit the full model
+lasso_full_result <- lasso_classifier(wdbc_iblcd_xtrain_full, wdbc_iblcd_ytrain, wdbc_iblcd_xtest_full, wdbc_iblcd_ytest)
+# fit the medium model
+lasso_medium_result <- lasso_classifier(wdbc_iblcd_xtrain_m, wdbc_iblcd_ytrain, wdbc_iblcd_xtest_m, wdbc_iblcd_ytest)
+# fit the low model
+lasso_low_result <- lasso_classifier(wdbc_iblcd_xtrain_l, wdbc_iblcd_ytrain, wdbc_iblcd_xtest_l, wdbc_iblcd_ytest)
+random_result <- random_classifier(wdbc_iblcd_xtest_l, wdbc_iblcd_ytest)
+
+```
+
+ROC-Imbalanced
+==============
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+
+
+
+df_comb.roc = data.frame(TPR = c(lasso_full_result[,tpr_index], lasso_medium_result[,tpr_index], lasso_low_result[,tpr_index], random_result[,tpr_index] ), FPR = c(lasso_full_result[,fpr_index], lasso_medium_result[,fpr_index], lasso_low_result[,fpr_index], random_result[,fpr_index]) , model = rep(c("FULL","MEDIUM", "LOW", "RANDOM"), times = c(length(lasso_full_result[,tpr_index]), length(lasso_medium_result[,tpr_index]), length(lasso_low_result[,tpr_index]), length(random_result[,tpr_index]))))
+
+ggplot(df_comb.roc, aes(x=FPR, y=TPR, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white")+
+  ggtitle("ROC Curve for four different classifiers") + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+PR-Imbalanced
+===========
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+df_comb.pr = data.frame(Precision = c(lasso_full_result[,precision_index], lasso_medium_result[,precision_index], lasso_low_result[,precision_index], random_result[,precision_index]), Recall = c(lasso_full_result[,recall_index], lasso_medium_result[,recall_index], lasso_low_result[,recall_index], random_result[,recall_index]) , model = rep(c("FULL", "MEDIUM", "LOW", "RANDOM"), times = c(length(lasso_full_result[,precision_index]), length(lasso_medium_result[,precision_index]), length(lasso_low_result[,precision_index]), length(random_result[,precision_index]))))
+
+ggplot(df_comb.pr, aes(y=Precision, x=Recall, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white")+
+  ggtitle("PR Curve for four different classifiers") + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+MCC-F1-Imbalanced
+=================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+df_comb.mf = data.frame(MCC = c(lasso_full_result[,mcc.nor_index], lasso_medium_result[,mcc.nor_index], lasso_low_result[,mcc.nor_index], random_result[,mcc.nor_index]), F_1 = c(lasso_full_result[,f_score_index], lasso_medium_result[,f_score_index], lasso_low_result[,f_score_index], random_result[,f_score_index]) , model = rep(c("FULL", "MEDIUM", "LOW", "RANDOM"), times = c(length(lasso_full_result[,mcc.nor_index]), length(lasso_medium_result[,mcc.nor_index]), length(lasso_low_result[,mcc.nor_index]), length(random_result[,mcc.nor_index]))))
+
+ggplot(df_comb.mf, aes(x=F_1, y=MCC, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white")+
+  ggtitle("MCC-F1 Curve for four different classifiers") + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+MCC-Precision-Imbalanced
+======================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+df_comb.mp = data.frame(MCC = c(lasso_full_result[,mcc.nor_index], lasso_medium_result[,mcc.nor_index], lasso_low_result[,mcc.nor_index], random_result[,mcc.nor_index]), Precision = c(lasso_full_result[,precision_index], lasso_medium_result[,precision_index], lasso_low_result[,precision_index], random_result[,precision_index]) , model = rep(c("FULL", "MEDIUM", "LOW", "RANDOM"), times = c(length(lasso_full_result[,mcc.nor_index]), length(lasso_medium_result[,mcc.nor_index]), length(lasso_low_result[,mcc.nor_index]), length(random_result[,mcc.nor_index]))))
+
+ggplot(df_comb.mp, aes(x=Precision, y=MCC, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white") +
+  ggtitle("MCC-Precision Curve for four different classifiers") + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+MCC-Recall-Imbalanced
+=====================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+df_comb.mp = data.frame(MCC = c(lasso_full_result[,mcc.nor_index], lasso_medium_result[,mcc.nor_index], lasso_low_result[,mcc.nor_index], random_result[,mcc.nor_index]), Recall = c(lasso_full_result[,recall_index], lasso_medium_result[,recall_index], lasso_low_result[,recall_index], random_result[,recall_index]) , model = rep(c("FULL", "MEDIUM", "LOW", "RANDOM"), times = c(length(lasso_full_result[,mcc.nor_index]), length(lasso_medium_result[,mcc.nor_index]), length(lasso_low_result[,mcc.nor_index]), length(random_result[,mcc.nor_index]))))
+
+ggplot(df_comb.mp, aes(x=Recall, y=MCC, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white") +
+  ggtitle("MCC-Recall Curve for four different classifiers") + 
+  theme(plot.title=element_text(hjust=0.5))
+```
