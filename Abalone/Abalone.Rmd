@@ -1,0 +1,538 @@
+---
+title: "Comparison between ROC and MCC-F1 curves with Abalone data"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+Abalone Data Preparation
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+faba <- read.table("/users/ccao/Downloads/Data/abalone.data",sep=",")
+faba$y <- ifelse(faba$V9>9,1,0)
+
+# before standardize
+xtrain <- faba[1:3133,1:8]
+ytrain <- as.factor( faba[1:3133,10] )
+xtest <- faba[-c(1:3133),1:8]
+ytest <- as.factor( faba[-c(1:3133),10] )
+
+mean <- sapply(xtrain[, 2:8], mean)
+sd <- sapply(xtrain[, 2:8], sd)
+
+# after standardize
+xtrain <- cbind(xtrain[, 1], scale(xtrain[, 2:8], center = T, scale = T))
+xtest <- cbind(xtest[, 1], scale(xtest[, 2:8], center = mean, scale = sd))
+```
+
+
+\textcolor{blue}{LASSO classifier}
+
+Model Fitting--LASSO
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+# Training the model on the standardized training set
+# alpha=0 for ridge penalty; alpha=1 for the LASSO penalty
+library(glmnet)
+cv.lasso <- cv.glmnet(x = xtrain, y = ytrain, family = "binomial", alpha = 1, 
+                      nfolds = 10, type.measure = "class")
+# optimal lambda from 10-fold cross-validation by lasso
+lamstd = cv.lasso$lambda.min
+lamstd
+
+fit <- glmnet(xtrain, ytrain, family = "binomial", alpha = 1)
+pred <- predict(fit, xtest, type="class", s = lamstd)
+
+# confusion matrix
+cfm_test <- table(pred, ytest)
+cfm_test
+# mean error rate
+mer <- (cfm_test[1,2]+cfm_test[2,1])/length(ytest)
+mer
+
+```
+
+
+ROC Curve--LASSO
+================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F,fig.height=4,fig.width=6}
+
+library(ROCR)
+library(ggplot2)
+# ROC curve for standardized data
+std_probtest <- predict(fit, xtest, type="response", s=lamstd)
+std_predresp <- prediction(std_probtest, ytest)
+perf_std <- performance(std_predresp, measure = "tpr", x.measure = "fpr")
+
+# TPR
+tpr.ptstd <- attr(perf_std, "y.values")[[1]]
+# FPR
+fpr.ptstd <- attr(perf_std, "x.values")[[1]]
+# threshold
+threshold <- attr(perf_std, "alpha.values")[[1]]
+# AUC
+auc.std <- attr(performance(std_predresp, "auc"), "y.values")[[1]]
+auc1 <- signif(auc.std, digits = 3)
+
+roc.std <- data.frame(FPR = fpr.ptstd, TPR = tpr.ptstd, model = "GLM-LASSO")
+
+ggplot(roc.std, aes(x=FPR, y=TPR,ymin=0, ymax=TPR)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  geom_abline(intercept=0, slope = 1, lty=2)+
+  ggtitle(paste("ROC Curve for Standardized Data with AUC=", auc1)) + 
+  theme(plot.title=element_text(hjust=0.5))+
+  geom_point(data = roc.std[575, ], color = "red", size = 2)
+```
+
+PR Curve--LASSO
+================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+# PR curve
+perf_std.pr <- performance(std_predresp, measure = "prec", x.measure = "rec")
+# precision
+precision <- attr(perf_std.pr, "y.values")[[1]]
+
+# recall
+recall <- attr(perf_std.pr, "x.values")[[1]]
+
+pr.std <- data.frame(Recall=recall, Precision = precision, model = "GLM-LASSO")
+ggplot(pr.std, aes(x=Recall, y=Precision, ymin=0, ymax=Precision)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  ggtitle(paste("PR Curve for Standardized Data with AUC=", "undetermined")) + 
+  theme(plot.title=element_text(hjust=0.5))+
+  geom_point(data = pr.std[575, ], color = "red", size = 2)
+
+```
+
+
+MCC-F1--LASSO
+=============
+```{r,echo=F, eval=T,cache=T, message=F,warning=F,fig.height=4,fig.width=6}
+perf_std.new <- performance(std_predresp, measure = "mat", x.measure =    
+                                "f")
+
+# mcc
+mcc.ptstd <- attr(perf_std.new, "y.values")[[1]]
+# normalised mcc: [-1, 1] to [0, 1]
+mcc.nor <- (mcc.ptstd + 1)/2
+# f score
+f.ptstd <- attr(perf_std.new, "x.values")[[1]]   
+# threshold
+threshold <- attr(perf_std.new, "alpha.values")[[1]]
+
+
+# mf stands for MCC-F_score curve
+mf.std <- data.frame(MCC.nor = mcc.nor, F_score = f.ptstd, model = "GLM-LASSO")
+
+# MCC-F1 Measure--LASSO
+
+# get the last f score
+f.cp = 2/(2+(length(ytest[ytest==0])/length(ytest[ytest==1])))
+f.cp <- max(f.ptstd[f.ptstd < f.cp], na.rm = T)
+# get the largest f score
+f.max = max(f.ptstd, na.rm = T)
+
+x_lower <- sort(f.ptstd[f.ptstd < f.cp], decreasing = F, na.last = F)
+x_lower[1] <- 0
+x_higher <- sort(f.ptstd[f.ptstd <= f.cp], decreasing = F)
+
+# find corresponding mcc.nor
+y_higher.index <- match(x_higher, f.ptstd)
+y_higher.index[length(y_higher.index)] <- y_higher.index[length(y_higher.index)- 1]
+y_higher <- mcc.nor[y_higher.index]
+
+auc_a <- sum((x_higher - x_lower) * y_higher)
+
+x1 <- sort(f.ptstd[c(match(f.max, f.ptstd):length(f.ptstd))], decreasing = F)
+x1_lower <- x1[c(1: length(x1)-1)]
+x1_higher <- x1[c(2: length(x1))]
+y1_higher.index <- match(f.max, f.ptstd) -1 + match(x1_higher, f.ptstd[c(match(f.max, f.ptstd):length(f.ptstd))])
+
+y1_higher <- mcc.nor[y1_higher.index]
+auc_b <- sum((x1_higher-x1_lower)*y1_higher)
+
+# measure
+auc1.mcc <- 1-(1*f.max-auc_a-auc_b)
+
+ggplot(mf.std, aes(x=F_score, y=MCC.nor, ymin=0, ymax=1, xmin=0, xmax=1)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  geom_abline(intercept=0.5, slope = 0, lty=2)+
+  ggtitle(paste("MCC-F_score Curve for Standardized Data with AUC=", auc1.mcc)) + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+MCC-Precision--LASSO
+====================
+```{r,echo=F, eval=T,cache=T,message=F,warning=F,fig.height=4,fig.width=6}
+mp.std <- data.frame(MCC.nor = mcc.nor, Precision = precision, model = "GLM-LASSO")
+ggplot(mp.std, aes(x=Precision, y=MCC.nor, ymin=0, ymax=1, xmin=0, xmax=1)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  geom_abline(intercept=0.5, slope = 0, lty=2)+
+  ggtitle(paste("MCC-Precision Curve for Standardized Data with AUC=", "undetermined")) + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+
+\textcolor{blue}{Ridge Penalty--a different classifier}
+
+Model Fitting--RIDGE
+```{r,echo=F, eval=T,cache=T,message=F,warning=F,fig.height=4,fig.width=6}
+# using Ridge penalty
+cv.ridge <- cv.glmnet(xtrain, ytrain, alpha=0, family="binomial", nfolds=10, type.measure = "class")
+# optimal lambda
+lamstd.ridge = cv.ridge$lambda.min
+# prediction
+fit.ridge <- glmnet(xtrain, ytrain, alpha=0, family = "binomial")
+pred.ridge <- predict(fit.ridge, xtest, type="class", s = lamstd.ridge)
+```
+
+ROC curve--RIDGE
+================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F,fig.height=4,fig.width=6}
+std_probtest.ridge <- predict(fit.ridge, xtest, type="response", s=lamstd.ridge)
+std_predresp.ridge <- prediction(std_probtest.ridge, ytest)
+perf_std.ridge <- performance(std_predresp.ridge, measure = "tpr", x.measure =    
+                                "fpr")
+# TPR
+tpr.ridge <- attr(perf_std.ridge, "y.values")[[1]]
+# FPR
+fpr.ridge <- attr(perf_std.ridge, "x.values")[[1]]
+# AUC
+auc.ridge <- attr(performance(std_predresp.ridge, "auc"), "y.values")[[1]]
+auc2 <- signif(auc.ridge, digits = 3)
+
+roc.ridge <- data.frame(FPR = fpr.ridge, TPR = tpr.ridge, model = "GLM-RIDGE")
+
+ggplot(roc.ridge, aes(x=FPR, y=TPR,ymin=0, ymax=TPR)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  geom_abline(intercept=0, slope = 1, lty=2)+
+  ggtitle(paste("ROC Curve for Standardized Data with AUC=", auc2)) + 
+  theme(plot.title=element_text(hjust=0.5))
+
+```
+
+PR Curve--RIDGE
+================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+# PR curve
+perf_std.ridge.pr <- performance(std_predresp.ridge, measure = "prec", x.measure = "rec")
+# precision
+precision.ridge <- attr(perf_std.ridge.pr, "y.values")[[1]]
+
+# recall
+recall.ridge <- attr(perf_std.ridge.pr, "x.values")[[1]]
+
+pr.ridge.std <- data.frame(Recall=recall.ridge, Precision = precision.ridge, model = "GLM-RIDGE")
+ggplot(pr.ridge.std, aes(x=Recall, y=Precision, ymin=0, ymax=Precision)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  ggtitle(paste("PR Curve for Standardized Data with AUC=", "undetermined")) + 
+  theme(plot.title=element_text(hjust=0.5))
+
+```
+
+MCC-F1--RIDGE
+=============
+```{r,echo=F, eval=T,cache=T, message=F,warning=F,fig.height=4,fig.width=6}
+perf_std.ridge.new <- performance(std_predresp.ridge, measure = "mat", x.measure = "f")
+perf_std.ridge.pr <- performance(std_predresp.ridge, measure = "prec", x.measure = "rec")
+# mcc
+mcc.ptstd.ridge <- attr(perf_std.ridge.new, "y.values")[[1]]
+# normalised mcc: [-1, 1] to [0, 1]
+mcc.nor.ridge <- (mcc.ptstd.ridge + 1)/2
+# f score
+f.ptstd.ridge <- attr(perf_std.ridge.new, "x.values")[[1]]  
+
+mf.std.ridge <- data.frame(MCC.nor.ridge = mcc.nor.ridge, F_score.ridge = f.ptstd.ridge, model = "GLM-RIDGE")
+
+# MCC-F1 Measure--RIDGE
+
+# get the last f score
+f.cp = 2/(2+(length(ytest[ytest==0])/length(ytest[ytest==1])))
+f.cp <- max(f.ptstd.ridge[f.ptstd.ridge < f.cp], na.rm = T)
+# get the largest f score
+f.max = max(f.ptstd.ridge, na.rm = T)
+
+x_lower <- sort(f.ptstd.ridge[f.ptstd.ridge < f.cp], decreasing = F, na.last = F)
+x_lower[1] <- 0
+x_higher <- sort(f.ptstd.ridge[f.ptstd.ridge <= f.cp], decreasing = F)
+
+# find corresponding mcc.nor
+y_higher.index <- match(x_higher, f.ptstd.ridge)
+y_higher.index[length(y_higher.index)] <- y_higher.index[length(y_higher.index)- 1]
+y_higher <- mcc.nor.ridge[y_higher.index]
+
+auc_a <- sum((x_higher - x_lower) * y_higher)
+
+x1 <- sort(f.ptstd.ridge[c(match(f.max, f.ptstd.ridge):length(f.ptstd.ridge))], decreasing = F)
+x1_lower <- x1[c(1: length(x1)-1)]
+x1_higher <- x1[c(2: length(x1))]
+y1_higher.index <- match(f.max, f.ptstd.ridge) -1 + match(x1_higher, f.ptstd.ridge[c(match(f.max, f.ptstd.ridge):length(f.ptstd.ridge))])
+
+y1_higher <- mcc.nor.ridge[y1_higher.index]
+auc_b <- sum((x1_higher-x1_lower)*y1_higher)
+
+# measure
+auc2.mcc <-1-(1*f.max-auc_a -auc_b)
+
+ggplot(mf.std.ridge, aes(x=F_score.ridge, y=MCC.nor.ridge, ymin=0, ymax=1, xmin=0, xmax=1)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  geom_abline(intercept=0.5, slope = 0, lty=2)+
+  ggtitle(paste("MCC-F_score Curve for Standardized Data with AUC=", auc2.mcc)) + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+MCC-Precision--RIDGE
+====================
+```{r,echo=F, eval=T,cache=T,message=F,warning=F,fig.height=4,fig.width=6}
+mp.std.ridge <- data.frame(MCC.nor.ridge = mcc.nor.ridge, Precision.ridge = precision.ridge, model = "GLM-RIDGE")
+ggplot(mp.std.ridge, aes(x=Precision.ridge, y=MCC.nor.ridge, ymin=0, ymax=1, xmin=0, xmax=1)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  geom_abline(intercept=0.5, slope = 0, lty=2)+
+  ggtitle(paste("MCC-Precision Curve for Standardized Data with AUC=", "undetermined")) + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+\newpage
+\textcolor{blue}{naive classifier}
+
+Model Fitting--naive classifier
+
+ROC Curve--NAIVE
+================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F,fig.height=4,fig.width=6}
+# predict based on column 2
+
+library(ROCR)
+library(ggplot2)
+# ROC curve for standardized data
+std_probtest.nai <- xtest[,2]*sd + mean
+std_predresp.nai <- prediction(std_probtest.nai, ytest)
+perf_std.nai <- performance(std_predresp.nai, measure = "tpr", x.measure = "fpr")
+# TPR
+tpr.ptstd.nai <- attr(perf_std.nai, "y.values")[[1]]
+# FPR
+fpr.ptstd.nai <- attr(perf_std.nai, "x.values")[[1]]
+# AUC
+auc.std.nai <- attr(performance(std_predresp.nai, "auc"), "y.values")[[1]]
+auc1.nai <- signif(auc.std.nai, digits = 3)
+
+roc.std.nai <- data.frame(FPR = fpr.ptstd.nai, TPR = tpr.ptstd.nai, model = "GLM-NAIVE")
+
+ggplot(roc.std.nai, aes(x=FPR, y=TPR,ymin=0, ymax=TPR)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  geom_abline(intercept=0, slope = 1, lty=2)+
+  ggtitle(paste("ROC Curve for Standardized Data with AUC=", auc1.nai)) + 
+  theme(plot.title=element_text(hjust=0.5))+
+  geom_point(data = roc.std[575, ], color = "red", size = 2)
+```
+
+PR Curve--NAIVE
+================
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+# PR curve
+perf_std.nai.pr <- performance(std_predresp.nai, measure = "prec", x.measure = "rec")
+# precision
+precision.nai <- attr(perf_std.nai.pr, "y.values")[[1]]
+
+# recall
+recall.nai <- attr(perf_std.nai.pr, "x.values")[[1]]
+
+pr.std.nai <- data.frame(Recall=recall.nai, Precision = precision.nai, model = "GLM-NAIVE")
+ggplot(pr.std.nai, aes(x=Recall, y=Precision, ymin=0, ymax=Precision)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  ggtitle(paste("PR Curve for Standardized Data with AUC=", "undetermined")) + 
+  theme(plot.title=element_text(hjust=0.5))+
+  geom_point(data = pr.std.nai[575, ], color = "red", size = 2)
+
+```
+
+
+MCC-F1--NAIVE
+=============
+```{r,echo=F, eval=T,cache=T, message=F,warning=F,fig.height=4,fig.width=6}
+perf_std.nai.new <- performance(std_predresp.nai, measure = "mat", x.measure =    
+                                "f")
+
+# mcc
+mcc.ptstd.nai <- attr(perf_std.nai.new, "y.values")[[1]]
+# normalised mcc: [-1, 1] to [0, 1]
+mcc.nor.nai <- (mcc.ptstd.nai + 1)/2
+# f score
+f.ptstd.nai <- attr(perf_std.nai.new, "x.values")[[1]]   
+# threshold
+threshold <- attr(perf_std.nai.new, "alpha.values")[[1]]
+
+
+# mf stands for MCC-F_score curve
+mf.std.nai <- data.frame(MCC.nor = mcc.nor.nai, F_score = f.ptstd.nai, model = "GLM-NAIVE")
+
+# MCC-F1 Measure--LASSO
+
+# get the last f score
+f.cp = 2/(2+(length(ytest[ytest==0])/length(ytest[ytest==1])))
+f.cp <- max(f.ptstd.nai[f.ptstd.nai < f.cp], na.rm = T)
+# get the largest f score
+f.max = max(f.ptstd.nai, na.rm = T)
+
+x_lower <- sort(f.ptstd.nai[f.ptstd.nai < f.cp], decreasing = F, na.last = F)
+x_lower[1] <- 0
+x_higher <- sort(f.ptstd.nai[f.ptstd.nai <= f.cp], decreasing = F)
+
+# find corresponding mcc.nor
+y_higher.index <- match(x_higher, f.ptstd.nai)
+y_higher.index[length(y_higher.index)] <- y_higher.index[length(y_higher.index)- 1]
+y_higher <- mcc.nor.nai[y_higher.index]
+
+auc_a <- sum((x_higher - x_lower) * y_higher)
+
+x1 <- sort(f.ptstd.nai[c(match(f.max, f.ptstd.nai):length(f.ptstd.nai))], decreasing = F)
+x1_lower <- x1[c(1: length(x1)-1)]
+x1_higher <- x1[c(2: length(x1))]
+y1_higher.index <- match(f.max, f.ptstd.nai) -1 + match(x1_higher, f.ptstd.nai[c(match(f.max, f.ptstd.nai):length(f.ptstd.nai))])
+
+y1_higher <- mcc.nor.nai[y1_higher.index]
+auc_b <- sum((x1_higher-x1_lower)*y1_higher)
+
+# measure
+auc1.mcc <- 1-(1*f.max-auc_a-auc_b)
+
+ggplot(mf.std.nai, aes(x=F_score, y=MCC.nor, ymin=0, ymax=1, xmin=0, xmax=1)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  geom_abline(intercept=0.5, slope = 0, lty=2)+
+  ggtitle(paste("MCC-F_score Curve for Standardized Data with AUC=", auc1.mcc)) + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+MCC-Precision--NAIVE
+====================
+```{r,echo=F, eval=T,cache=T,message=F,warning=F,fig.height=4,fig.width=6}
+mp.std.nai <- data.frame(MCC.nor.nai = mcc.nor.nai, Precision.nai = precision.nai, model = "GLM-NAIVE")
+ggplot(mp.std.nai, aes(x=Precision.nai, y=MCC.nor.nai, ymin=0, ymax=1, xmin=0, xmax=1)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  geom_abline(intercept=0.5, slope = 0, lty=2)+
+  ggtitle(paste("MCC-Precision Curve for Standardized Data with AUC=", "undetermined")) + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+\newpage
+
+ROC Curve for different classifiers on the same graph
+```{r,echo=F, eval=T,cache=T,message=F,warning=F,fig.height=4,fig.width=6}
+df_comb.roc = data.frame(tpr.new = c(tpr.ptstd, tpr.ridge, tpr.ptstd.nai), fpr.new = c(fpr.ptstd, fpr.ridge, fpr.ptstd.nai) , model = rep(c("GLM-LASSO", "GLM-RIDGE", "GLM-NAIVE"), times = c(length(tpr.ptstd), length(tpr.ridge), length(tpr.ptstd.nai))))
+
+ggplot(df_comb.roc, aes(x=fpr.new, y=tpr.new, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white")+
+  ggtitle("ROC Curve for three different classifiers(LASSO&RIDGE&NAIVE") + 
+  theme(plot.title=element_text(hjust=0.5))
+```
+
+PR Curve for different classifiers on the same graph
+```{r,echo=F, eval=T,cache=T,message=F,warning=F,fig.height=4,fig.width=6}
+df_comb.pr = data.frame(Recall.new = c(recall, recall.ridge, recall.nai), Precision.new = c(precision, precision.ridge, precision.nai) , model = rep(c("GLM-LASSO", "GLM-RIDGE", "GLM-NAIVE"), times = c(length(recall), length(recall.ridge), length(recall.nai))))
+
+ggplot(df_comb.pr, aes(x=Recall.new, y=Precision.new, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white")+
+  ggtitle("PR Curve for three different classifiers(LASSO&RIDGE&NAIVE") + 
+  theme(plot.title=element_text(hjust=0.5))
+  
+```
+
+MCC-F1 Curve for different classifiers on the same graph
+```{r,echo=F, eval=T,cache=T,message=F,warning=F,fig.height=4,fig.width=6}
+df_comb = data.frame(MCC.nor.new = c(mcc.nor, mcc.nor.ridge, mcc.nor.nai), F_score.new = c(f.ptstd, f.ptstd.ridge, f.ptstd.nai) , model = rep(c("GLM-LASSO", "GLM-RIDGE", "GLM-NAIVE"), times = c(length(mcc.nor), length(mcc.nor.ridge), length(mcc.nor.nai))))
+
+ggplot(df_comb, aes(x=F_score.new, y=MCC.nor.new, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white")+
+  ggtitle("MCC-F_score Curve for two different classifiers(LASSO&RIDGE") + 
+  theme(plot.title=element_text(hjust=0.5))
+  
+```
+
+MCC-Precision Curve for different classifiers on the same graph
+```{r,echo=F, eval=T,cache=T,message=F,warning=F,fig.height=4,fig.width=6}
+df_comb.mp = data.frame(MCC.nor.new = c(mcc.nor, mcc.nor.ridge, mcc.nor.nai), Precision.new = c(precision, precision.ridge, precision.nai) , model = rep(c("GLM-LASSO", "GLM-RIDGE", "GLM-NAIVE"), times = c(length(mcc.nor), length(mcc.nor.ridge), length(mcc.nor.nai))))
+
+ggplot(df_comb.mp, aes(x=Precision.new, y=MCC.nor.new, group=model, color = model, ymin=0, ymax=1, xmin=0, xmax=1)) + 
+  geom_point(size = 0.2, shape = 21, fill="white")+
+  ggtitle("MCC-Precision Curve for three different classifiers(LASSO&RIDGE&NAIVE") + 
+  theme(plot.title=element_text(hjust=0.5))
+  
+```
+
+\newpage
+
+```{r,echo=F, eval=F,cache=T,message=F,warning=F,fig.height=4,fig.width=6}
+
+# MCC-F1 Measure--LASSO
+
+# get the last f score
+f.cp = 2/(2+(length(ytest[ytest==0])/length(ytest[ytest==1])))
+f.cp <- max(f.ptstd[f.ptstd < f.cp], na.rm = T)
+# get the largest f score
+f.max = max(f.ptstd, na.rm = T)
+
+x_lower <- sort(f.ptstd[f.ptstd < f.cp], decreasing = F, na.last = F)
+x_lower[1] <- 0
+x_higher <- sort(f.ptstd[f.ptstd <= f.cp], decreasing = F)
+
+# find corresponding mcc.nor
+y_higher.index <- match(x_higher, f.ptstd)
+y_higher.index[length(y_higher.index)] <- y_higher.index[length(y_higher.index)- 1]
+y_higher <- mcc.nor[y_higher.index]
+
+auc1 <- sum((x_higher - x_lower) * y_higher)
+
+x1 <- sort(f.ptstd[c(match(f.max, f.ptstd):length(f.ptstd))], decreasing = F)
+x1_lower <- x1[c(1: length(x1)-1)]
+x1_higher <- x1[c(2: length(x1))]
+y1_higher.index <- match(f.max, f.ptstd) -1 + match(x1_higher, f.ptstd[c(match(f.max, f.ptstd):length(f.ptstd))])
+
+y1_higher <- mcc.nor[y1_higher.index]
+auc2 <- sum((x1_higher-x1_lower)*y1_higher)
+
+# measure
+1-(1*f.max-auc1-auc2)
+```
+
+
+
+```{r,echo=F, eval=F,cache=T,message=F,warning=F,fig.height=4,fig.width=6}
+# MCC-F1 Measure--RIDGE
+
+# get the last f score
+f.cp = 2/(2+(length(ytest[ytest==0])/length(ytest[ytest==1])))
+f.cp <- max(f.ptstd.ridge[f.ptstd.ridge < f.cp], na.rm = T)
+# get the largest f score
+f.max = max(f.ptstd.ridge, na.rm = T)
+
+x_lower <- sort(f.ptstd.ridge[f.ptstd.ridge < f.cp], decreasing = F, na.last = F)
+x_lower[1] <- 0
+x_higher <- sort(f.ptstd.ridge[f.ptstd.ridge <= f.cp], decreasing = F)
+
+# find corresponding mcc.nor
+y_higher.index <- match(x_higher, f.ptstd.ridge)
+y_higher.index[length(y_higher.index)] <- y_higher.index[length(y_higher.index)- 1]
+y_higher <- mcc.nor.ridge[y_higher.index]
+
+auc1 <- sum((x_higher - x_lower) * y_higher)
+
+x1 <- sort(f.ptstd.ridge[c(match(f.max, f.ptstd.ridge):length(f.ptstd.ridge))], decreasing = F)
+x1_lower <- x1[c(1: length(x1)-1)]
+x1_higher <- x1[c(2: length(x1))]
+y1_higher.index <- match(f.max, f.ptstd.ridge) -1 + match(x1_higher, f.ptstd.ridge[c(match(f.max, f.ptstd.ridge):length(f.ptstd.ridge))])
+
+y1_higher <- mcc.nor.ridge[y1_higher.index]
+auc2 <- sum((x1_higher-x1_lower)*y1_higher)
+
+# measure
+1-(1*f.max-auc1-auc2)
+```
+
+```{r,echo=F, eval=F,cache=T,message=F,warning=F,fig.height=4,fig.width=6}
+# MCC-F1--LASSO flipping around x and y
+ggplot(mf.std, aes(x=MCC.nor, y=F_score, ymin=0, ymax=F_score, xmin=0)) + geom_point()+
+  geom_ribbon(alpha=0.2)+
+  geom_vline(xintercept=0.5, lty=2)+
+  ggtitle(paste("F_score-MCC Curve for Standardized Data with AUC=", "undetermined")) + 
+  theme(plot.title=element_text(hjust=0.5))+
+  geom_point(data = mf.std[575, ], color = "red", size = 2)
+```
