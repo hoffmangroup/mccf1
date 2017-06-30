@@ -8,7 +8,7 @@ output:
 
 Abalone Data Preparation
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
-faba <- read.table("/users/ccao/Downloads/Data/abalone.data",sep=",")
+faba <- read.table("abalone.data",sep=",")
 faba$y <- ifelse(faba$V9>9,1,0)
 
 # before standardize
@@ -79,8 +79,7 @@ ggplot(roc.std, aes(x=FPR, y=TPR,ymin=0, ymax=TPR)) + geom_point()+
   geom_ribbon(alpha=0.2)+
   geom_abline(intercept=0, slope = 1, lty=2)+
   ggtitle(paste("ROC Curve for Standardized Data with AUC=", auc1)) + 
-  theme(plot.title=element_text(hjust=0.5))+
-  geom_point(data = roc.std[575, ], color = "red", size = 2)
+  theme(plot.title=element_text(hjust=0.5))
 ```
 
 PR Curve--LASSO
@@ -97,9 +96,8 @@ recall <- attr(perf_std.pr, "x.values")[[1]]
 pr.std <- data.frame(Recall=recall, Precision = precision, model = "GLM-LASSO")
 ggplot(pr.std, aes(x=Recall, y=Precision, ymin=0, ymax=Precision)) + geom_point()+
   geom_ribbon(alpha=0.2)+
-  ggtitle(paste("PR Curve for Standardized Data with AUC=", "undetermined")) + 
-  theme(plot.title=element_text(hjust=0.5))+
-  geom_point(data = pr.std[575, ], color = "red", size = 2)
+  ggtitle("PR Curve for Standardized Data") + 
+  theme(plot.title=element_text(hjust=0.5))
 
 ```
 
