@@ -6,15 +6,23 @@ output: html_document
 
 
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+
 predicted_value_1 = c(rbeta(3000, 9, 2), rbeta(7000, 2, 4), rbeta(1000, 2, 4))
-pred <- prediction(predicted_value_1, real_value)
+pred <- prediction(predicted_value_1, c(rep(1, 10000), rep(0, 1000)))
 perf <- performance(pred, measure = "mat", x.measure = "f")
 # mcc
 mcc <- attr(perf, "y.values")[[1]]
 # normalised mcc: [-1, 1] to [0, 1]
 mcc.nor <- (mcc + 1)/2
 # f score
-f <- attr(perf, "x.values")[[1]]   
+f <- attr(perf, "x.values")[[1]]  
+perf <- performance(pred, measure = "prec", x.measure = "rec")
+# precision
+precision <- attr(perf, "y.values")[[1]]
+# recall
+recall <- attr(perf, "x.values")[[1]]
+f(2) <- (1+2^2)*precision*recall/((4*precision)+recall)
+f(0.5) <- (1+0.5^2)*precision*recall/((0.25*precision)+recall)
 
 # measure(metric) of mcc-f1: auc*(1-d)
 
@@ -58,8 +66,10 @@ mcc_measure <- format(round(mcc_measure, 3), nsmall = 3)
 df <- data.frame(X = f, Y= mcc.nor, measure = mcc_measure, model = "type A")
   df$model_and_measure <- paste(df$model, df$measure)
   
+  df_label = df %>% group_by(model) %>% summarise(label_value = model)
+  
   ggplot(df, aes(x=X, y=Y, group = model_and_measure, color = model_and_measure,ymin=0, ymax=1, xmin=0, xmax=1 )) + geom_point(size = 0.2, shape = 21, fill="white") +
-  theme(plot.title=element_text(hjust=0.5))
+  theme(plot.title=element_text(hjust=0.5))+ geom_text(data = , aes(label = measure), hjust = 0.7, vjust = 1)
 ```
 
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
