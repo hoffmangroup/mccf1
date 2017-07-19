@@ -275,6 +275,52 @@ classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_n
 classification_plot(real, prediction, c(recall_index, mcc.nor_index), model_name, "mcc-recall", "Recall", "MCC", "10000:1000")
 ```
 
+Different predictive powers for negative case
+```{r,echo=F, eval=T,cache=T, message=F,warning=F}
+real = real_value
+
+## Imbalanced 1000: 10000
+real = real_value
+predicted_value_z = c(rbeta(1000, 7, 5), rbeta(5000, 1, 7), rbeta(5000, 5, 7))
+predicted_value_x = c(rbeta(1000, 7, 5), rbeta(10000, 3.5, 7))
+prediction = cbind(predicted_value_z, predicted_value_x)
+model_name= c("type z", "type x")
+# ROC 
+classification_plot(real, prediction, c(fpr_index, recall_index), model_name, "ROC", "FRR", "Recall", "1000:10000")
+# PR
+classification_plot(real, prediction, c(recall_index, precision_index), model_name, "PR", "Recall", "Precision", "1000:10000" )
+# mcc-f1
+classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name, "mcc-f1", "F1", "MCC",  "1000:10000")
+
+ ## Imbalanced 10000:1000
+real = real_value_reversed
+predicted_value_v = c(rbeta(10000, 7, 5), rbeta(500, 1, 7), rbeta(500, 5, 7))
+predicted_value_n = c(rbeta(10000, 7, 5), rbeta(1000, 3, 7))
+prediction = cbind(predicted_value_v, predicted_value_n)
+model_name= c("type v", "type n")
+# ROC 
+classification_plot(real, prediction, c(fpr_index, recall_index), model_name, "ROC", "FRR", "Recall", "10000:1000")
+# PR
+classification_plot(real, prediction, c(recall_index, precision_index), model_name, "PR", "Recall", "Precision", "10000:1000" )
+# mcc-f1
+classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name, "mcc-f1", "F1", "MCC",  "10000:1000")
+
+## Balanced 1000:1000
+real = c(rep(1, 1000), rep(0, 1000))
+predicted_value_m = c(rbeta(1000, 7, 5), rbeta(500, 1, 7), rbeta(500, 5, 7))
+predicted_value_r = c(rbeta(1000, 7, 5), rbeta(1000, 3.5, 7))
+prediction = cbind(predicted_value_m, predicted_value_r)
+model_name= c("type m", "type r")
+# ROC 
+classification_plot(real, prediction, c(fpr_index, recall_index), model_name, "ROC", "FRR", "Recall", "1000:1000")
+# PR
+classification_plot(real, prediction, c(recall_index, precision_index), model_name, "PR", "Recall", "Precision", "1000:1000" )
+# mcc-f1
+classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name, "mcc-f1", "F1", "MCC",  "1000:1000")
+
+```
+
+
 
 Similar AUC but different ROC and PR 
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
