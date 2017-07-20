@@ -10,9 +10,9 @@ real_value = c(rep(1, 1000), rep(0, 10000))
 real_value_reversed = c(rep(1, 10000), rep(0, 1000))
 # A and B have different distributions for real positives
 # classifier A: good early retrieval performance
-predicted_value_A = c(rbeta(300, 12, 2), rbeta(700, 3, 3.5),rbeta(10000, 2, 3))
+predicted_value_A = c(rbeta(300, 12, 2), rbeta(700, 3, 4),rbeta(10000, 2, 3))
 # classifier B:
-predicted_value_B = c(rbeta(600, 5, 3), rbeta(400, 4, 3), rbeta(10000, 2, 3))
+predicted_value_B = c(rbeta(1000, 4, 3), rbeta(10000, 2, 3))
 # classifier comparison:
 predicted_value_comparison = c(rbeta(1000, 4, 3), rbeta(10000, 2, 4))
 # perfect classifier
@@ -22,8 +22,8 @@ predicted_value_random = c(runif(11000, 0, 1))
 # C and D have different distribution for real negative case
 predicted_value_a = c(rbeta(1000, 4, 3), rbeta(5000, 1, 7), rbeta(5000, 4, 4))
 predicted_value_b = c(rbeta(1000, 4, 3), rbeta(5000, 3, 6), rbeta(5000, 3.5, 5))
-predicted_value_C = c(rbeta(3000, 9, 2), rbeta(7000, 2, 4), rbeta(1000, 2, 4))
-predicted_value_D = c(rbeta(6000, 4, 3), rbeta(4000, 3, 4), rbeta(1000, 2, 4))
+predicted_value_C = c(rbeta(3000, 12, 2), rbeta(7000, 3, 4), rbeta(1000, 2, 3))
+predicted_value_D = c(rbeta(10000, 4, 3), rbeta(1000, 2, 3))
 
 df <- cbind.data.frame(real_value, predicted_value_A, predicted_value_B)
 ```
