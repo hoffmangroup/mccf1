@@ -53,45 +53,91 @@ f <- attr(perf, "x.values")[[1]]
 auc <- round(attr(performance(pred, "auc"), "y.values")[[1]], 2)
 
 
-# measure(metric) of mcc-f1: auc*(1-d)
+# measure(metric) of mcc-f1: sqrt(2)*auc*(sqrt(2)-d)
 
-# get the last f score
-f.cp = 2/(2+(length(real[real==0])/length(real[real==1])))
-f.cp <- max(f[f < f.cp], na.rm = T)
+# get rid of NaN values
+mcc.nor_truncated <- mcc.nor[2: (length(mcc.nor)-1)]
+f_truncated <- f[2: (length(mcc.nor)-1)]
+
+# get the last f score as approximate for the cut off point
+# f.cp = 2/(2+(length(real[real==0])/length(real[real==1])))
+# f.cp <- max(f_truncated[f_truncated < f.cp], na.rm = T)
+f.cp <- f_truncated[length(f_truncated)]
 # get the largest f score
-f.max = max(f, na.rm = T)
+f.max = max(f_truncated, na.rm = T)
+x_lower <- sort(f_truncated[c(1: (match(f.max, f_truncated)-1))], decreasing = F, na.last = F)
 
-x_lower <- sort(f[c(1: (match(f.max, f)-1))], decreasing = F, na.last = F)
-x_lower[1] <- 0
-x_higher <- sort(f[c(1: match(f.max, f))], decreasing = F)
+x_higher <- sort(f_truncated[c(2: match(f.max, f_truncated))], decreasing = F)
 
 # find corresponding mcc.nor
-y_higher.index <- match(x_higher, f)
-y_higher <- mcc.nor[y_higher.index]
-y_lower <- c(0.5,y_higher)
-y_lower <- y_lower[-length(y_lower)]
+y_higher.index <- match(x_higher, f_truncated)
+y_higher <- mcc.nor_truncated[y_higher.index]
+y_lower.index <- match(x_lower, f_truncated)
+y_lower <- mcc.nor_truncated[y_lower.index]
 
 # auc1
-auc1 <- sum(0.5*(x_higher - x_lower) *(y_lower + y_higher))
+auc1 <- sum(0.5*(x_higher - x_lower) *(y_lower + y_higher), na.rm = T)
 
-x1 <- sort(f[c(match(f.max, f):length(f))], decreasing = F)
+x1 <- sort(f_truncated[c(match(f.max, f_truncated):length(f_truncated))], decreasing = F)
 x1_lower <- x1[c(1: length(x1)-1)]
 x1_higher <- x1[c(2: length(x1))]
-y1_higher.index <- match(f.max, f) -1 + match(x1_higher, f[c(match(f.max, f):length(f))])
+# y1_higher.index <- match(x1_higher, f_truncated[match(f.max, f_truncated):length(f_truncated)])
+# x1_lower.index <- match(x1_lower, f_truncated[match(f.max, f_truncated):length(f_truncated)])
+y1_higher.index <- match(f.max, f_truncated) -1 + match(x1_higher, f_truncated[c(match(f.max, f_truncated):length(f_truncated))])
+y1_lower.index <- match(f.max, f_truncated) -1 + match(x1_lower, f_truncated[c(match(f.max, f_truncated):length(f_truncated))])
 
-y1_higher <- mcc.nor[y1_higher.index]
+y1_higher <- mcc.nor_truncated[y1_higher.index]
+y1_lower <- mcc.nor_truncated[y1_lower.index]
 # auc2
-auc2 <- sum((x1_higher-x1_lower)*y1_higher)
+auc2 <- sum(0.5*(x1_higher-x1_lower)*(y1_lower + y1_higher))
 
-# auc of mcc-f1
-mcc_auc <- auc1 - f.cp*0.5 -auc2
+# auc of mcc-f1 
+mcc_auc <- auc1 - f.cp*0.5 -auc2   # 0.5 is also an approximate
 # smallest distance to (1, 1)
-distance <- sqrt(((1-mcc.nor)^2+(1-f)^2))
+distance <- sqrt(((1-mcc.nor_truncated)^2+(1-f_truncated)^2))
 min_distance <- min(distance, na.rm = T)
 # mcc-f1 measure
 mcc_measure <- sqrt(2)*mcc_auc*(sqrt(2)-min_distance)
 # round the number to three decimal place
 mcc_measure <- round(mcc_measure, 3)
+
+# # get the last f score
+# f.cp = 2/(2+(length(real[real==0])/length(real[real==1])))
+# f.cp <- max(f[f < f.cp], na.rm = T)
+# # get the largest f score
+# f.max = max(f, na.rm = T)
+# 
+# x_lower <- sort(f[c(1: (match(f.max, f)-1))], decreasing = F, na.last = F)
+# x_lower[1] <- 0
+# x_higher <- sort(f[c(1: match(f.max, f))], decreasing = F)
+# 
+# # find corresponding mcc.nor
+# y_higher.index <- match(x_higher, f)
+# y_higher <- mcc.nor[y_higher.index]
+# y_lower <- c(0.5,y_higher)
+# y_lower <- y_lower[-length(y_lower)]
+# 
+# # auc1
+# auc1 <- sum(0.5*(x_higher - x_lower) *(y_lower + y_higher))
+# 
+# x1 <- sort(f[c(match(f.max, f):length(f))], decreasing = F)
+# x1_lower <- x1[c(1: length(x1)-1)]
+# x1_higher <- x1[c(2: length(x1))]
+# y1_higher.index <- match(f.max, f) -1 + match(x1_higher, f[c(match(f.max, f):length(f))])
+# 
+# y1_higher <- mcc.nor[y1_higher.index]
+# # auc2
+# auc2 <- sum((x1_higher-x1_lower)*y1_higher)
+# 
+# # auc of mcc-f1
+# mcc_auc <- auc1 - f.cp*0.5 -auc2
+# # smallest distance to (1, 1)
+# distance <- sqrt(((1-mcc.nor)^2+(1-f)^2))
+# min_distance <- min(distance, na.rm = T)
+# # mcc-f1 measure
+# mcc_measure <- sqrt(2)*mcc_auc*(sqrt(2)-min_distance)
+# # round the number to three decimal place
+# mcc_measure <- round(mcc_measure, 3)
 
 
 output <-cbind.data.frame(fpr, precision, recall, mcc.nor, f, auc, mcc_measure)
@@ -196,10 +242,10 @@ classification_plot(real, prediction, c(fpr_index, recall_index), model_name, "R
 classification_plot(real, prediction, c(recall_index, precision_index), model_name,  "PR", "Recall", "Precision","10000:10000")
 # mcc-f1
 classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name,  "mcc-f1", "F1", "MCC", "10000:10000")
-# mcc-precision
-classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_name, "mcc-precision", "Precision", "MCC", "10000:10000")
-# mcc-recall
-classification_plot(real, prediction, c(recall_index, mcc.nor_index), model_name, "mcc-recall", "Recall", "MCC", "10000:10000")
+# # mcc-precision
+# classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_name, "mcc-precision", "Precision", "MCC", "10000:10000")
+# # mcc-recall
+# classification_plot(real, prediction, c(recall_index, mcc.nor_index), model_name, "mcc-recall", "Recall", "MCC", "10000:10000")
 ```
 
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
@@ -213,10 +259,10 @@ classification_plot(real, prediction, c(fpr_index, recall_index, auc_index), mod
 classification_plot(real, prediction, c(recall_index, precision_index), model_name,  "PR", "Recall", "Precision","5000:5000")
 # mcc-f1
 classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name,  "mcc-f1", "F1", "MCC", "5000:5000")
-# mcc-precision
-classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_name, "mcc-precision", "Precision", "MCC", "5000:5000")
-# mcc-recall
-classification_plot(real, prediction, c(recall_index, mcc.nor_index), model_name, "mcc-recall", "Recall", "MCC", "5000:5000")
+# # mcc-precision
+# classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_name, "mcc-precision", "Precision", "MCC", "5000:5000")
+# # mcc-recall
+# classification_plot(real, prediction, c(recall_index, mcc.nor_index), model_name, "mcc-recall", "Recall", "MCC", "5000:5000")
 ```
 
 Similar AUC but different ROC and PR 

@@ -7,69 +7,77 @@ output: html_document
 
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
 
-predicted_value_1 = c(rbeta(3000, 9, 2), rbeta(7000, 2, 4), rbeta(1000, 2, 4))
-pred <- prediction(predicted_value_1, c(rep(1, 10000), rep(0, 1000)))
+real <- c(rep(1, 1000), rep(0, 10000))
+real_value_reversed <- c(rep(1, 10000), rep(0, 1000))
+predicted_value_A = c(rbeta(300, 12, 2), rbeta(700, 3, 4),rbeta(10000, 2, 3))
+predicted_value_B = c(rbeta(1000, 4, 3), rbeta(10000, 2, 3))
+predicted_value_C = c(rbeta(3000, 12, 2), rbeta(7000, 3, 4), rbeta(1000, 2, 3))
+pred <- prediction(predicted_value_B, real)
+# pred <- prediction(predicted_value_C, real_value_reversed)
+
+# concerns for this implementation:
+# 1. we didn't sort the entire points lists
+# 2. minor mistake in situation2 of mcc-f1 curve where there is no sharp angle
+
+
+
 perf <- performance(pred, measure = "mat", x.measure = "f")
 # mcc
 mcc <- attr(perf, "y.values")[[1]]
 # normalised mcc: [-1, 1] to [0, 1]
 mcc.nor <- (mcc + 1)/2
 # f score
-f <- attr(perf, "x.values")[[1]]  
-perf <- performance(pred, measure = "prec", x.measure = "rec")
-# precision
-precision <- attr(perf, "y.values")[[1]]
-# recall
-recall <- attr(perf, "x.values")[[1]]
-f(2) <- (1+2^2)*precision*recall/((4*precision)+recall)
-f(0.5) <- (1+0.5^2)*precision*recall/((0.25*precision)+recall)
+f <- attr(perf, "x.values")[[1]]   
+threshold <- attr(perf, "alpha.values")[[1]]
 
-# measure(metric) of mcc-f1: auc*(1-d)
+# get rid of NaN values
+mcc.nor_truncated <- mcc.nor[2: (length(mcc.nor)-1)]
+f_truncated <- f[2: (length(mcc.nor)-1)]
 
-# get the last f score
-f.cp = 2/(2+(length(real_value[real_value==0])/length(real_value[real_value==1])))
-f.cp <- max(f[f < f.cp], na.rm = T)
+# get the last f score as approximate for the cut off point
+# f.cp = 2/(2+(length(real[real==0])/length(real[real==1])))
+# f.cp <- max(f_truncated[f_truncated < f.cp], na.rm = T)
+f.cp <- f_truncated[length(f_truncated)]
 # get the largest f score
-f.max = max(f, na.rm = T)
+f.max = max(f_truncated, na.rm = T)
 
-x_lower <- sort(f[c(1: (match(f.max, f)-1))], decreasing = F, na.last = F)
-x_lower[1] <- 0
-x_higher <- sort(f[c(1: match(f.max, f))], decreasing = F)
+x_lower <- sort(f_truncated[c(1: (match(f.max, f_truncated)-1))], decreasing = F, na.last = F)
+
+x_higher <- sort(f_truncated[c(2: match(f.max, f_truncated))], decreasing = F)
 
 # find corresponding mcc.nor
-y_higher.index <- match(x_higher, f)
-y_higher <- mcc.nor[y_higher.index]
-y_lower <- c(0.5,y_higher)
-y_lower <- y_lower[-length(y_lower)]
+y_higher.index <- match(x_higher, f_truncated)
+y_higher <- mcc.nor_truncated[y_higher.index]
+y_lower.index <- match(x_lower, f_truncated)
+y_lower <- mcc.nor_truncated[y_lower.index]
 
 # auc1
-auc1 <- sum(0.5*(x_higher - x_lower)*(y_lower + y_higher), na.rm = T)
+auc1 <- sum(0.5*(x_higher - x_lower) *(y_lower + y_higher), na.rm = T)
 
-x1 <- sort(f[c(match(f.max, f):length(f))], decreasing = F)
+x1 <- sort(f_truncated[c(match(f.max, f_truncated):length(f_truncated))], decreasing = F)
 x1_lower <- x1[c(1: length(x1)-1)]
 x1_higher <- x1[c(2: length(x1))]
-y1_higher.index <- match(f.max, f) -1 + match(x1_higher, f[c(match(f.max, f):length(f))])
+# y1_higher.index <- match(x1_higher, f_truncated[match(f.max, f_truncated):length(f_truncated)])
+# x1_lower.index <- match(x1_lower, f_truncated[match(f.max, f_truncated):length(f_truncated)])
+y1_higher.index <- match(f.max, f_truncated) -1 + match(x1_higher, f_truncated[c(match(f.max, f_truncated):length(f_truncated))])
+y1_lower.index <- match(f.max, f_truncated) -1 + match(x1_lower, f_truncated[c(match(f.max, f_truncated):length(f_truncated))])
 
-y1_higher <- mcc.nor[y1_higher.index]
+y1_higher <- mcc.nor_truncated[y1_higher.index]
+y1_lower <- mcc.nor_truncated[y1_lower.index]
 # auc2
-auc2 <- sum((x1_higher-x1_lower)*y1_higher)
+auc2 <- sum(0.5*(x1_higher-x1_lower)*(y1_lower + y1_higher))
 
-# auc of mcc-f1
-mcc_auc <- auc1 - f.cp*0.5 -auc2
+# auc of mcc-f1 
+mcc_auc <- auc1 - f.cp*0.5 -auc2   # 0.5 is also an approximate
 # smallest distance to (1, 1)
-distance <- sqrt(((1-mcc.nor)^2+(1-f)^2))
+distance <- sqrt(((1-mcc.nor_truncated)^2+(1-f_truncated)^2))
 min_distance <- min(distance, na.rm = T)
 # mcc-f1 measure
 mcc_measure <- sqrt(2)*mcc_auc*(sqrt(2)-min_distance)
-mcc_measure <- format(round(mcc_measure, 3), nsmall = 3)
+# round the number to three decimal place
+mcc_measure <- round(mcc_measure, 3)
 
-df <- data.frame(X = f, Y= mcc.nor, measure = mcc_measure, model = "type A")
-  df$model_and_measure <- paste(df$model, df$measure)
-  
-  df_label = df %>% group_by(model) %>% summarise(label_value = model)
-  
-  ggplot(df, aes(x=X, y=Y, group = model_and_measure, color = model_and_measure,ymin=0, ymax=1, xmin=0, xmax=1 )) + geom_point(size = 0.2, shape = 21, fill="white") +
-  theme(plot.title=element_text(hjust=0.5))+ geom_text(data = , aes(label = measure), hjust = 0.7, vjust = 1)
+mcc_measure
 ```
 
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
@@ -83,7 +91,7 @@ predicted_value_B = c(rbeta(3000, 4, 3), rbeta(2000, 3, 4), rbeta(negative_num, 
 real = real_value
 prediction = cbind(predicted_value_A, predicted_value_B)
 model_name= c("type A", "type B")
-metric_index = c(f_score_index, mcc.nor_index, mcc_measure_index)
+metric_index = c(f_score_index, mcc.nor_truncated_index, mcc_measure_index)
 
 num_of_classifiers = ncol(prediction)
   list_of_metrics = list()
