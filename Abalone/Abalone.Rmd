@@ -120,7 +120,7 @@ threshold <- attr(perf_std.new, "alpha.values")[[1]]
 
 
 # mf stands for MCC-F_score curve
-mf.std <- data.frame(MCC.nor = mcc.nor, F_score = f.ptstd, model = "GLM-LASSO")
+mf.std <- data.frame(MCC_normalized = mcc.nor, F1 = f.ptstd, model = "GLM-LASSO")
 
 # MCC-F1 Measure--LASSO
 
@@ -154,12 +154,13 @@ auc1.mcc <- 1-(1*f.max-auc_a-auc_b)
 
 
 
-ggplot(mf.std, aes(x=F_score, y=MCC.nor, ymin=0, ymax=1, xmin=0, xmax=1)) + geom_point()+
-  geom_ribbon(alpha=0.2)+
-  geom_abline(intercept=0.5, slope = 0, lty=2)+
-  ggtitle(paste("MCC-F_score Curve for Standardized Data with AUC=", auc1.mcc)) + 
-  theme(plot.title=element_text(hjust=0.5)) +
-geom_point(data = mf.std[length(mcc.nor)-1, ], aes(x = F_score, y=MCC.nor), colour = "red", size = 5)
+ggplot(mf.std, aes(x=F1, y=MCC_normalized, ymin=0, ymax=1, xmin=0, xmax=1)) + geom_point()+
+  geom_segment(aes(x = 0, y = 0.5, xend = f.cp, yend =0.5), lty = 2)+
+  geom_segment(aes(x = 0, y = 1, xend = 1, yend =1), lty = 2)+
+  geom_segment(aes(x = 1, y = 0.5, xend = 1, yend = 1), lty = 2)+
+  ggtitle("MCC-F1 Curve Example") + 
+  theme(plot.title=element_text(hjust=0.5)) 
+# + geom_point(data = mf.std[length(mcc.nor)-1, ], aes(x = F_score, y=MCC.nor), colour = "red", size = 5)
 ```
 
 MCC-Precision--LASSO
