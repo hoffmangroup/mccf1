@@ -12,7 +12,7 @@ real_value_reversed <- c(rep(1, 10000), rep(0, 1000))
 predicted_value_A = c(rbeta(300, 12, 2), rbeta(700, 3, 4),rbeta(10000, 2, 3))
 predicted_value_B = c(rbeta(1000, 4, 3), rbeta(10000, 2, 3))
 predicted_value_C = c(rbeta(3000, 12, 2), rbeta(7000, 3, 4), rbeta(1000, 2, 3))
-pred <- prediction(predicted_value_B, real)
+pred <- prediction(predicted_value_A, real)
 # pred <- prediction(predicted_value_C, real_value_reversed)
 
 # concerns for this implementation:
@@ -40,6 +40,7 @@ f_truncated <- f[2: (length(mcc.nor)-1)]
 f.cp <- f_truncated[length(f_truncated)]
 # get the largest f score
 f.max = max(f_truncated, na.rm = T)
+
 
 x_lower <- sort(f_truncated[c(1: (match(f.max, f_truncated)-1))], decreasing = F, na.last = F)
 

@@ -158,8 +158,8 @@ ggplot(mf.std, aes(x=F1, y=MCC_normalized, ymin=0, ymax=1, xmin=0, xmax=1)) + ge
   geom_segment(aes(x = 0, y = 0.5, xend = f.cp, yend =0.5), lty = 2)+
   geom_segment(aes(x = 0, y = 1, xend = 1, yend =1), lty = 2)+
   geom_segment(aes(x = 1, y = 0.5, xend = 1, yend = 1), lty = 2)+
-  ggtitle("MCC-F1 Curve Example") + 
-  theme(plot.title=element_text(hjust=0.5)) 
+  theme(plot.title=element_text(hjust=0.5)) +
+  labs(x = "F1 score", y = "normalized MCC")
 # + geom_point(data = mf.std[length(mcc.nor)-1, ], aes(x = F_score, y=MCC.nor), colour = "red", size = 5)
 ```
 
