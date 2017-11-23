@@ -51,9 +51,9 @@ first_col <- ggplot(df, aes(x= fpr, y= recall, group = classifier, color = class
   theme(legend.position="none", plot.title=element_text(hjust=0.5, size = 12), 
         axis.text = element_text(size = 8), axis.title = element_text(size = 10)) +
   coord_equal(ratio=1)+ 
-  scale_color_manual(values=c("firebrick1", "gold", "forestgreen", "darkorange", "deepskyblue", "mediumpurple1"))
+  scale_color_manual(values=c("firebrick1", "gold", "mediumspringgreen", "darkorange1", "deepskyblue", "mediumorchid3"))
 
-c("firebrick1", "gold", "forestgreen", "darkorange", "deepskyblue", "mediumpurple1")
+
   
 ## plot the second column
 df_A <- data.frame(recall = output_A$recall, precision = output_A$precision, classifier = "A",
@@ -77,7 +77,10 @@ second_col <- ggplot(df, aes(x= recall, y= precision, group = classifier, color 
   labs(x = "Recall", y = "Precision", title = "PR") +
   theme(legend.position="none", plot.title=element_text(hjust=0.5, size = 12),
         axis.text = element_text(size = 8), axis.title = element_text(size = 10)) +
-  coord_equal(ratio=1) 
+  coord_equal(ratio=1) + 
+  scale_color_manual(values=c("firebrick1", "gold", "mediumspringgreen", "darkorange1", "deepskyblue", "mediumorchid3"))
+
+
 
 
 ## plot the third column
@@ -104,7 +107,10 @@ third_col <- ggplot(df, aes(x= f, y= mcc.nor, group = classifier, color = classi
         axis.text = element_text(size = 8), axis.title = element_text(size = 10),
         legend.text=element_text(size=10), legend.title = element_text(size = 12)) +
   coord_equal(ratio=1)+
-  guides(colour = guide_legend(override.aes = list(size=1.5)))
+  guides(colour = guide_legend(override.aes = list(size=1.5)))+ 
+  scale_color_manual(values=c("firebrick1", "gold", "mediumspringgreen", "darkorange1", "deepskyblue", "mediumorchid3"))
+
+
 
 legend <- get_legend(third_col)
 third_col <- third_col + theme(legend.position="none")

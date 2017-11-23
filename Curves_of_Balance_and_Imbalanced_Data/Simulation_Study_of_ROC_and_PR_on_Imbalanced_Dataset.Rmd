@@ -7,24 +7,11 @@ Data Simulation
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
 # real binary outcomes
 real_value = c(rep(1, 1000), rep(0, 10000))
-real_value_reversed = c(rep(1, 10000), rep(0, 1000))
-# A and B have different distributions for real positives
+real_value_reversed = c(rep(0, 1000), rep(1, 10000))
 # classifier A: good early retrieval performance
-predicted_value_A = c(rbeta(300, 12, 2), rbeta(700, 3, 4),rbeta(10000, 2, 3))
+predicted_value_A = c(rbeta(300, 9, 2), rbeta(700, 2, 4), rbeta(10000, 2, 4))
 # classifier B:
-predicted_value_B = c(rbeta(1000, 4, 3), rbeta(10000, 2, 3))
-# classifier comparison:
-predicted_value_comparison = c(rbeta(1000, 4, 3), rbeta(10000, 2, 4))
-# perfect classifier
-predicted_value_perfect = c(rep(1, 1000), rep(0, 10000))
-# random classifier
-predicted_value_random = c(runif(11000, 0, 1))
-# C and D have different distribution for real negative case
-predicted_value_a = c(rbeta(1000, 4, 3), rbeta(5000, 1, 7), rbeta(5000, 4, 4))
-predicted_value_b = c(rbeta(1000, 4, 3), rbeta(5000, 3, 6), rbeta(5000, 3.5, 5))
-predicted_value_C = c(rbeta(3000, 12, 2), rbeta(7000, 3, 4), rbeta(1000, 2, 3))
-predicted_value_D = c(rbeta(10000, 4, 3), rbeta(1000, 2, 3))
-
+predicted_value_B = c(rbeta(600, 4, 3), rbeta(400, 3, 4), rbeta(10000, 2, 4))
 df <- cbind.data.frame(real_value, predicted_value_A, predicted_value_B)
 ```
 
@@ -32,25 +19,15 @@ Function of Binary Classification
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
 library(ROCR)
 library(ggplot2)
-# library(PRROC)
 
 classification_result <- function (real, prediction){
   
 pred <- prediction(prediction, real)
 perf <- performance(pred, measure = "tpr", x.measure = "fpr")
-
+# TPR
+tpr <- attr(perf, "y.values")[[1]]
 # FPR
 fpr <- attr(perf, "x.values")[[1]]
-# threshold
-threshold <- attr(perf, "alpha.values")[[1]]
-# accumulated auc
-# accumulated_auc <- c()
-# loop_index = 1
-# for (f in fpr){
-#   accumulated_auc[loop_index] <- attr(performance(pred, measure = "auc", fpr.stop = f), "y.values")[[1]]
-#   loop_index = loop_index + 1
-# }
-
 # PR curve
 perf <- performance(pred, measure = "prec", x.measure = "rec")
 # precision
@@ -65,130 +42,78 @@ mcc <- attr(perf, "y.values")[[1]]
 mcc.nor <- (mcc + 1)/2
 # f score
 f <- attr(perf, "x.values")[[1]]   
+# thresholds
+thresholds <- attr(perf, "alpha.values")[[1]]
 # auc
 auc <- attr(performance(pred, "auc"), "y.values")[[1]]
-auc <- round(auc, 2)
-# f_2 score, which emphasize on recall
-f_2 <- (1+2^2)*precision*recall/((4*precision)+recall)
-# f_0.5 score, which emphasize on precision
-f_0.5 <- (1+0.5^2)*precision*recall/((0.25*precision)+recall)
-
-# measure(metric) of mcc-f1: sqrt(2)*auc*(sqrt(2)-d)
-
+# mcc_f1 metric
 # get rid of NaN values
 mcc.nor_truncated <- mcc.nor[2: (length(mcc.nor)-1)]
-f_truncated <- f[2: (length(mcc.nor)-1)]
+f_truncated <- f[2: (length(f)-1)]
+# new metric based on distance
+# distance_total_sum <- 0
+# for (i in 1:length(mcc.nor_truncated)){
+#   d <- sqrt((mcc.nor_truncated[i]-1)^2 + (f_truncated[i]-1)^2)
+#   distance_total_sum <- distance_total_sum + d
+# }
+# metric <- 1 - (distance_total_sum/length(mcc.nor_truncated))/sqrt(2)
 
-# get the last f score as approximate for the cut off point
-# f.cp = 2/(2+(length(real[real==0])/length(real[real==1])))
-# f.cp <- max(f_truncated[f_truncated < f.cp], na.rm = T)
-f.cp <- f_truncated[length(f_truncated)]
-# get the largest f score
-f.max = max(f_truncated, na.rm = T)
-x_lower <- sort(f_truncated[c(1: (match(f.max, f_truncated)-1))], decreasing = F, na.last = F)
-
-x_higher <- sort(f_truncated[c(2: match(f.max, f_truncated))], decreasing = F)
-
-# find corresponding mcc.nor
-y_higher.index <- match(x_higher, f_truncated)
-y_higher <- mcc.nor_truncated[y_higher.index]
-y_lower.index <- match(x_lower, f_truncated)
-y_lower <- mcc.nor_truncated[y_lower.index]
-
-# auc1
-auc1 <- sum(0.5*(x_higher - x_lower) *(y_lower + y_higher), na.rm = T)
-
-x1 <- sort(f_truncated[c(match(f.max, f_truncated):length(f_truncated))], decreasing = F)
-x1_lower <- x1[c(1: length(x1)-1)]
-x1_higher <- x1[c(2: length(x1))]
-# y1_higher.index <- match(x1_higher, f_truncated[match(f.max, f_truncated):length(f_truncated)])
-# x1_lower.index <- match(x1_lower, f_truncated[match(f.max, f_truncated):length(f_truncated)])
-y1_higher.index <- match(f.max, f_truncated) -1 + match(x1_higher, f_truncated[c(match(f.max, f_truncated):length(f_truncated))])
-y1_lower.index <- match(f.max, f_truncated) -1 + match(x1_lower, f_truncated[c(match(f.max, f_truncated):length(f_truncated))])
-
-y1_higher <- mcc.nor_truncated[y1_higher.index]
-y1_lower <- mcc.nor_truncated[y1_lower.index]
-# auc2
-auc2 <- sum(0.5*(x1_higher-x1_lower)*(y1_lower + y1_higher))
-
-# auc of mcc-f1 
-mcc_auc <- auc1 - f.cp*0.5 -auc2   # 0.5 is also an approximate
-# smallest distance to (1, 1)
-distance <- sqrt(((1-mcc.nor_truncated)^2+(1-f_truncated)^2))
-min_distance <- min(distance, na.rm = T)
-# mcc-f1 measure
-mcc_measure <- sqrt(2)*mcc_auc*(sqrt(2)-min_distance)
-# round the number to three decimal place
-mcc_measure <- round(mcc_measure, 3)
-
-# # get the last f score
-# f.cp = 2/(2+(length(real[real==0])/length(real[real==1])))
-# f.cp <- max(f[f < f.cp], na.rm = T)
-# # get the largest f score
-# f.max = max(f, na.rm = T)
-# 
-# x_lower <- sort(f[c(1: (match(f.max, f)-1))], decreasing = F, na.last = F)
-# x_lower[1] <- 0
-# x_higher <- sort(f[c(1: match(f.max, f))], decreasing = F)
-# 
-# # find corresponding mcc.nor
-# y_higher.index <- match(x_higher, f)
-# y_higher <- mcc.nor[y_higher.index]
-# y_lower <- c(0.5,y_higher)
-# y_lower <- y_lower[-length(y_lower)]
-# 
-# # auc1
-# auc1 <- sum(0.5*(x_higher - x_lower) *(y_lower + y_higher), na.rm = T)
-# 
-# x1 <- sort(f[c(match(f.max, f):length(f))], decreasing = F)
-# x1_lower <- x1[c(1: length(x1)-1)]
-# x1_higher <- x1[c(2: length(x1))]
-# y1_higher.index <- match(f.max, f) -1 + match(x1_higher, f[c(match(f.max, f):length(f))])
-# 
-# y1_higher <- mcc.nor[y1_higher.index]
-# # auc2
-# auc2 <- sum((x1_higher-x1_lower)*y1_higher)
-# 
-# # auc of mcc-f1
-# mcc_auc <- auc1 - f.cp*0.5 -auc2
-# # smallest distance to (1, 1)
-# distance <- sqrt(((1-mcc.nor)^2+(1-f)^2))
-# min_distance <- min(distance, na.rm = T)
-# # mcc-f1 measure
-# mcc_measure <- sqrt(2)*mcc_auc*(sqrt(2)-min_distance)
-# # round the number to three decimal place
-# mcc_measure <- round(mcc_measure, 3)
-
-output <-cbind.data.frame(fpr, precision, recall, mcc.nor, f, auc, mcc_measure, f_2, f_0.5) # accumulated_auc)
-  return(output)
+total_sum <- 0
+num <- 100
+c <- (max(mcc.nor_truncated)-min(mcc.nor_truncated))/num
+for (i in 1:num){
+  # find all the points with mcc between c and c*i
+  pos1 <- which(mcc.nor_truncated >= min(mcc.nor_truncated)+(i-1)*c)
+  pos2 <- which(mcc.nor_truncated <= min(mcc.nor_truncated)+i*c)
+  pos <- c()
+  for (m in pos1){
+    if  (m %in% pos2){
+      pos <- c(pos, m)
+    }
+  }
+  sum <- 0
+  for (j in pos){
+    d <- sqrt((mcc.nor_truncated[j]-1)^2 + (f_truncated[j]-1)^2)
+    sum <- sum + d
+  }
+  total_sum <- total_sum + sum/length(pos)
 }
 
 
-fpr_index = 1
-precision_index = 2
-recall_index = 3
-mcc.nor_index = 4
-f_score_index = 5
-auc_index = 6
-mcc_measure_index = 7
-f_2_index = 8
-f_0.5_index = 9
-# accumulated_auc_index = 10
 
+metric <- 1 - (total_sum/num)/sqrt(2)
+
+# finding the best threshold (closest to (1,1))
+distance = c()
+for (i in (1:length(mcc.nor))){
+  distance <- c(distance, sqrt((1-mcc.nor[i])^2 + (1-f[i])^2))
+}
+
+cut <- thresholds[match(min(distance, na.rm = T), distance)]
+
+output <-cbind.data.frame(tpr, fpr, precision, recall, mcc.nor, f, auc, metric, cut)
+  return(output)
+}
+tpr_index = 1
+fpr_index = 2
+precision_index = 3
+recall_index = 4 
+mcc.nor_index = 5 
+f_score_index = 6
+auc_index = 7
+metric_index = 8
+cut_indxt = 9
 ```
 
 Plot funtion
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
-
 # real is the real value(vector); 
 # prediction is the predictions of classifiers(dataset with multiple columns and each column stands for the prediction under a classifier)
 # metric_index is a two-element vector. the first element is the index of the metric that should be x axis, and the second element is the index of the metric that should be on y axis
-# model_name is a vector of the name of of the models
-# type_of_curve is a string. e.g "ROC"
-# x_axis is a string that is the label for x axis
-# y_axis is a string that is the label for y axis
-# positive_vs_negative is the proportion of positive cases versus negative cases
-classification_plot <- function(real, prediction, metric_index, model_name, type_of_curve, x_axis, y_axis, positive_vs_negative){
+# model is a vector of the name of of the models
+# type of curve is a string. e.g "ROC"
+
+classification_plot <- function(real, prediction, metric_index, model_name, type_of_curve){
   num_of_classifiers = ncol(prediction)
   list_of_metrics = list()
   num = 1
@@ -198,10 +123,6 @@ classification_plot <- function(real, prediction, metric_index, model_name, type
     num = num + 1
   }
   
-  
-  
-  # we don't have auc metric
-  if (length(metric_index) == 2){
   x_value <- c()
   y_value <- c()
   length_of_metrics <- c()
@@ -211,46 +132,15 @@ classification_plot <- function(real, prediction, metric_index, model_name, type
     y_value <- c(y_value, list_of_metrics[[num]][, metric_index[2]])
     length_of_metrics <- c(length_of_metrics, length(list_of_metrics[[num]][, metric_index[1]]))
     num = num + 1
-
   }
+  
   df <- data.frame(X = x_value, Y= y_value, model = rep(model_name, times = length_of_metrics))
-
-
-  ggplot(df, aes(x=X, y=Y, group = model, color = model, ymin=0, ymax=1, xmin=0, xmax=1 )) + geom_point(size = 0.2, shape = 21, fill="white")+
-  ggtitle(paste(type_of_curve, " Curve for different classifiers on \ndata set with positive versus negative" , positive_vs_negative)) +
-  theme(plot.title=element_text(hjust=0.5))+ labs(x=x_axis, y=y_axis)
-    
-
-}
-
-
-  # we have auc metric
- else if (length(metric_index) == 3){
-  x_value <- c()
-  y_value <- c()
-  auc_metric <- c()
-  length_of_metrics <- c()
-  num = 1
-  while (num <= num_of_classifiers){
-    x_value <- c(x_value, list_of_metrics[[num]][, metric_index[1]])
-    y_value <- c(y_value, list_of_metrics[[num]][, metric_index[2]])
-    auc_metric <- c(auc_metric, list_of_metrics[[num]][,metric_index[3]])
-    length_of_metrics <- c(length_of_metrics, length(list_of_metrics[[num]][, metric_index[1]]))
-    num = num + 1
-
-  }
-  df <- data.frame(X = x_value, Y= y_value, measure = auc_metric, model = rep(model_name, times = length_of_metrics))
-  df$model_and_measure <- paste(df$model, df$measure)
-
   
-
-  ggplot(df, aes(x=X, y=Y, group = model_and_measure, color = model_and_measure,ymin=0, ymax=1, xmin=0, xmax=1 )) + geom_point(size = 0.2, shape = 21, fill="white")+
-  ggtitle(paste(type_of_curve, " Curve for different classifiers on \ndata set with positive versus negative" , positive_vs_negative)) +
-  theme(plot.title=element_text(hjust=0.5))+ labs(x=x_axis, y=y_axis)
-    
-  }
+  ggplot(df, aes(x=X, y=Y, group = model, color = model, ymin=0, ymax=1, xmin=0, xmax=1 )) + geom_point(size = 0.2, shape = 21, fill="white")+
+  ggtitle(paste(type_of_curve, " Curve for three different classifiers")) + 
+  theme(plot.title=element_text(hjust=0.5))
+  
 }
-
 
 
 
@@ -259,129 +149,26 @@ classification_plot <- function(real, prediction, metric_index, model_name, type
 
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
 real = real_value
-
 prediction = cbind(predicted_value_A, predicted_value_B)
 model_name= c("type A", "type B")
 
 # ROC 
-classification_plot(real, prediction, c(fpr_index, recall_index, auc_index), model_name, "ROC", "FPR", "Recall","1000:10000")
+classification_plot(real, prediction, c(fpr_index, tpr_index), model_name, "ROC")
 # PR
-classification_plot(real, prediction, c(recall_index, precision_index), model_name,  "PR", "Recall", "Precision","1000:10000")
+classification_plot(real, prediction, c(recall_index, precision_index), model_name, "PR")
 # mcc-f1
-classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name,  "mcc-f1", "F1", "MCC", "1000:10000")
-# # mcc-precision
-# classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_name, "mcc-precision", "Precision", "MCC", "1000:10000")
-# # mcc-recall
-# classification_plot(real, prediction, c(recall_index, mcc.nor_index), model_name, "mcc-recall", "Recall", "MCC", "1000:10000")
-# # accumulated auc-fpr
-# classification_plot(real, prediction, c(fpr_index, accumulated_auc_index), model_name, "accumulated_auc-fpr", "FPR", "Accumulated AUC", "1000:10000")
-# # f1-fpr
-# classification_plot(real, prediction, c(fpr_index, f_score_index), model_name, "f1-fpr", "fpr", "f1", "1000:10000")
-# # f2-fpr
-# classification_plot(real, prediction, c(fpr_index, f_2_index), model_name, "f2-fpr", "fpr", "f2", "1000:10000")
-# # f0.5-fpr
-# classification_plot(real, prediction, c(fpr_index, f_0.5_index), model_name, "f0.5-fpr", "fpr", "f0.5", "1000:10000")
-# # mcc-f_2
-# classification_plot(real, prediction, c(f_2_index, mcc.nor_index), model_name, "mcc-f2", "F2", "MCC", "1000:10000")
-# # mcc-f_0.5
-# classification_plot(real, prediction, c(f_0.5_index, mcc.nor_index), model_name, "mcc-f0.5", "F0.5", "MCC", "1000:10000")
-```
+classification_plot(real, prediction, c(f_score_index, mcc.nor_index), model_name, "mcc-f1")
 
-```{r,echo=F, eval=T,cache=T, message=F,warning=F}
-# real = real_value
-# prediction = cbind(predicted_value_a, predicted_value_b, predicted_value_perfect, predicted_value_random)
-# model_name= c("type a", "type b", "perfect", "random")
-# 
-# # ROC 
-# classification_plot(real, prediction, c(fpr_index, recall_index, auc_index), model_name, "ROC", "FPR", "Recall","1000:10000")
-# # PR
-# classification_plot(real, prediction, c(recall_index, precision_index), model_name,  "PR", "Recall", "Precision","1000:10000")
-# # mcc-f1
-# classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name,  "mcc-f1", "F1", "MCC", "1000:10000")
-# # # mcc-precision
-# # classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_name, "mcc-precision", "Precision", "MCC", "1000:10000")
-# # # mcc-recall
-# # classification_plot(real, prediction, c(recall_index, mcc.nor_index), model_name, "mcc-recall", "Recall", "MCC", "1000:10000")
 ```
-
 
 ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
 real = real_value_reversed
-prediction = cbind(predicted_value_C, predicted_value_D)
-model_name= c("type C", "type D")
+prediction = cbind(predicted_value_A, predicted_value_B)
+model_name= c("type A", "type B")
 
 # ROC 
-classification_plot(real, prediction, c(fpr_index, recall_index), model_name, "ROC", "FRR", "Recall", "10000:1000")
+classification_plot(real, prediction, c(fpr_index, tpr_index), model_name, "ROC")
 # PR
-classification_plot(real, prediction, c(recall_index, precision_index), model_name, "PR", "Recall", "Precision", "10000:1000" )
-# mcc-f1
-classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name, "mcc-f1", "F1", "MCC",  "10000:1000")
-# # mcc-precision
-# classification_plot(real, prediction, c(precision_index, mcc.nor_index), model_name, "mcc-precision","Precision", "MCC", "10000:1000")
-# # mcc-recall
-# classification_plot(real, prediction, c(recall_index, mcc.nor_index), model_name, "mcc-recall", "Recall", "MCC", "10000:1000")
+classification_plot(real, prediction, c(recall_index, precision_index), model_name, "PR")
+classification_plot(real, prediction, c(f_score_index, mcc.nor_index), model_name, "mcc-f1")
 ```
-
-# Different predictive powers for negative case
-# ```{r,echo=F, eval=T,cache=T, message=F,warning=F}
-# real = real_value
-# 
-# ## Imbalanced 1000: 10000
-# real = real_value
-# predicted_value_z = c(rbeta(1000, 7, 5), rbeta(5000, 1, 7), rbeta(5000, 5, 7))
-# predicted_value_x = c(rbeta(1000, 7, 5), rbeta(10000, 3.5, 7))
-# prediction = cbind(predicted_value_z, predicted_value_x)
-# model_name= c("type z", "type x")
-# # ROC 
-# classification_plot(real, prediction, c(fpr_index, recall_index), model_name, "ROC", "FRR", "Recall", "1000:10000")
-# # PR
-# classification_plot(real, prediction, c(recall_index, precision_index), model_name, "PR", "Recall", "Precision", "1000:10000" )
-# # mcc-f1
-# classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name, "mcc-f1", "F1", "MCC",  "1000:10000")
-# 
-#  ## Imbalanced 10000:1000
-# real = real_value_reversed
-# predicted_value_v = c(rbeta(10000, 7, 5), rbeta(500, 1, 7), rbeta(500, 5, 7))
-# predicted_value_n = c(rbeta(10000, 7, 5), rbeta(1000, 3, 7))
-# prediction = cbind(predicted_value_v, predicted_value_n)
-# model_name= c("type v", "type n")
-# # ROC 
-# classification_plot(real, prediction, c(fpr_index, recall_index), model_name, "ROC", "FRR", "Recall", "10000:1000")
-# # PR
-# classification_plot(real, prediction, c(recall_index, precision_index), model_name, "PR", "Recall", "Precision", "10000:1000" )
-# # mcc-f1
-# classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name, "mcc-f1", "F1", "MCC",  "10000:1000")
-# 
-# ## Balanced 1000:1000
-# real = c(rep(1, 1000), rep(0, 1000))
-# predicted_value_m = c(rbeta(1000, 7, 5), rbeta(500, 1, 7), rbeta(500, 5, 7))
-# predicted_value_r = c(rbeta(1000, 7, 5), rbeta(1000, 3.5, 7))
-# prediction = cbind(predicted_value_m, predicted_value_r)
-# model_name= c("type m", "type r")
-# # ROC 
-# classification_plot(real, prediction, c(fpr_index, recall_index), model_name, "ROC", "FRR", "Recall", "1000:1000")
-# # PR
-# classification_plot(real, prediction, c(recall_index, precision_index), model_name, "PR", "Recall", "Precision", "1000:1000" )
-# # mcc-f1
-# classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name, "mcc-f1", "F1", "MCC",  "1000:1000")
-#```
-
-
-
-Similar AUC but different ROC and PR 
-```{r,echo=F, eval=T,cache=T, message=F,warning=F}
-real = real_value
-predicted_value_G = c(rbeta(350, 15, 0.5), rbeta(650, 2.25, 4), rbeta(10000, 2, 4))
-predicted_value_H = c(rbeta(400, 3.3, 3), rbeta(600, 3, 4), rbeta(10000, 2, 4))
-predicted_value_I = c(rbeta(400, 3.3, 3), rbeta(600, 3, 4), rbeta(4550, 1, 10), rbeta(5450, 4, 4.5))
-prediction = cbind(predicted_value_G, predicted_value_H, predicted_value_I)
-model_name= c("type G", "type H", "type I")
-
-# ROC 
-classification_plot(real, prediction, c(fpr_index, recall_index, auc_index), model_name, "ROC", "FRR", "Recall", "1000:10000")
-# PR
-classification_plot(real, prediction, c(recall_index, precision_index), model_name, "PR", "Recall", "Precision", "1000:10000")
-# mcc-f1
-classification_plot(real, prediction, c(f_score_index, mcc.nor_index, mcc_measure_index), model_name, "mcc-f1", "F1", "MCC",  "1000:10000")
-```
-
