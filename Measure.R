@@ -1,48 +1,44 @@
 library(ROCR)
 library(ggplot2)
 
-classification_result <- function (real, prediction){
+mccf1_feature <- function(real, predicted,fold=100,graph=T,title="the MCC-F1 score curve"){
+  # real is a vector of real values
+  # predicted is a vector of predicted values
+  # fold is the number that will be used to divide the range of normalized Matthews Correlation Coefficient
+  # graph is whether or not a graph of the MCC-F1 curve will be plotted.
+  # title is the title of the graph
   
-  pred <- prediction(prediction, real)
+  pred <- prediction(predicted, real)
   perf <- performance(pred, measure = "tpr", x.measure = "fpr")
-  # TPR
-  tpr <- attr(perf, "y.values")[[1]]
-  # FPR
-  fpr <- attr(perf, "x.values")[[1]]
-  # PR curve
-  perf <- performance(pred, measure = "prec", x.measure = "rec")
-  # precision
-  precision <- attr(perf, "y.values")[[1]]
-  # recall
-  recall <- attr(perf, "x.values")[[1]]
-  # mcc-f1
+  
   perf <- performance(pred, measure = "mat", x.measure = "f")
-  # mcc
+  # get MCC
   mcc <- attr(perf, "y.values")[[1]]
-  # normalised mcc: [-1, 1] to [0, 1]
+  # get normalised MCC: change the range of MCC from [-1, 1] to [0, 1]
   mcc.nor <- (mcc + 1)/2
-  # f score
+  # get F1 score
   f <- attr(perf, "x.values")[[1]]   
-  # thresholds
+  # get the thresholds
   thresholds <- attr(perf, "alpha.values")[[1]]
-  # auc
-  auc <- attr(performance(pred, "auc"), "y.values")[[1]]
-  # mcc_f1 metric
+  
+  if (graph){
+    df <- data.frame(F1 = f, MCC.nor = mcc.nor)
+    
+    ggplot(df, aes(x=F1, y=MCC.nor, ymin=0, ymax=1, xmin=0, xmax=1 )) + geom_point(size = 0.2, shape = 21, fill="white")+
+      theme(plot.title=element_text(hjust=0.5))+
+      coord_equal(ratio=1)+
+      labs(x = "F1 score", y = "normalized MCC", title = title)
+  }
+  
   # get rid of NaN values
   mcc.nor_truncated <- mcc.nor[2: (length(mcc.nor)-1)]
   f_truncated <- f[2: (length(f)-1)]
-  # new metric based on distance
-  # distance_total_sum <- 0
-  # for (i in 1:length(mcc.nor_truncated)){
-  #   d <- sqrt((mcc.nor_truncated[i]-1)^2 + (f_truncated[i]-1)^2)
-  #   distance_total_sum <- distance_total_sum + d
-  # }
-  # metric <- 1 - (distance_total_sum/length(mcc.nor_truncated))/sqrt(2)
   
-  total_sum <- 0
-  num <- 100
-  c <- (max(mcc.nor_truncated)-min(mcc.nor_truncated))/num
-  for (i in 1:num){
+  # calculate mcc_f1 metric
+  
+  sums <- c()
+  c <- (max(mcc.nor_truncated)-min(mcc.nor_truncated))/fold
+  for (i in 1:fold){
     # find all the points with mcc between c and c*i
     pos1 <- which(mcc.nor_truncated >= min(mcc.nor_truncated)+(i-1)*c)
     pos2 <- which(mcc.nor_truncated <= min(mcc.nor_truncated)+i*c)
@@ -57,14 +53,14 @@ classification_result <- function (real, prediction){
       d <- sqrt((mcc.nor_truncated[j]-1)^2 + (f_truncated[j]-1)^2)
       sum <- sum + d
     }
-    total_sum <- total_sum + sum/length(pos)
+    
+    sums <- c(sums, sum/length(pos))
   }
   
+  total_sum <- sum(sums,na.rm=T)
+  measure <- 1 - (total_sum/length(sums))/sqrt(2)
   
-  
-  metric <- 1 - (total_sum/num)/sqrt(2)
-  
-  # finding the best threshold (closest to (1,1))
+  # find the best(top) threshold (closest to (1,1))
   distance = c()
   for (i in (1:length(mcc.nor))){
     distance <- c(distance, sqrt((1-mcc.nor[i])^2 + (1-f[i])^2))
@@ -72,15 +68,7 @@ classification_result <- function (real, prediction){
   
   cut <- thresholds[match(min(distance, na.rm = T), distance)]
   
-  output <-cbind.data.frame(tpr, fpr, precision, recall, mcc.nor, f, auc, metric, cut)
-  return(output)
+  # output of the function is the MCC-F1 metric and the top threshold
+  result <- list(measure=measure, cut=cut)
+  result
 }
-tpr_index = 1
-fpr_index = 2
-precision_index = 3
-recall_index = 4 
-mcc.nor_index = 5 
-f_score_index = 6
-auc_index = 7
-metric_index = 8
-cut_indxt = 9
