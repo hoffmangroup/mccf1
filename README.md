@@ -5,8 +5,9 @@ This README would normally document whatever steps are necessary to get your app
 ### What is this repository for? ###
 
 * Quick summary
-The MCC-F1Measure reads an input dataset of real values and prediction values of binary classification, 
-and outputs the corresponding MCC-F1 metric of this prediction.
+
+The MCC-F1Measure reads an input dataset of real values and prediction values of binary classification, and outputs the corresponding MCC-F1 metric and the best threshold of this prediction.
+
 * Version
 * [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
 
@@ -15,8 +16,10 @@ and outputs the corresponding MCC-F1 metric of this prediction.
 * Summary of set up
 * Configuration
 * Dependencies
+
 R (version 3.3.3)
 R packages ROCR
+
 * Database configuration
 * How to run tests
 * Deployment instructions

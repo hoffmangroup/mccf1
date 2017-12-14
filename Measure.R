@@ -1,14 +1,15 @@
 library(ROCR)
 library(ggplot2)
 
-mccf1_feature <- function(real, predicted,fold=100,graph=T,title="the MCC-F1 score curve"){
-  # real is a vector of real values
-  # predicted is a vector of predicted values
+mccf1_feature <- function(actualvector, predictedvector,fold=100,plotCurve=T,.title="the MCC-F1 score curve",.curveFileName){
+  # actualvector is a vector of actual values in binary classification
+  # predictedvector is a vector of predicted values in binary classification
   # fold is the number that will be used to divide the range of normalized Matthews Correlation Coefficient
-  # graph is whether or not a graph of the MCC-F1 curve will be plotted.
-  # title is the title of the graph
+  # plotCurve is whether or not the MCC-F1 curve will be plotted.
+  # title is the title of the curve
+  # curveFileName is the location and name of the curve if the user wants to save the curve automatically
   
-  pred <- prediction(predicted, real)
+  pred <- prediction(predictedvector, actualvector)
   perf <- performance(pred, measure = "tpr", x.measure = "fpr")
   
   perf <- performance(pred, measure = "mat", x.measure = "f")
@@ -21,14 +22,27 @@ mccf1_feature <- function(real, predicted,fold=100,graph=T,title="the MCC-F1 sco
   # get the thresholds
   thresholds <- attr(perf, "alpha.values")[[1]]
   
-  if (graph){
-    df <- data.frame(F1 = f, MCC.nor = mcc.nor)
+  df <- data.frame(F1 = f, MCC.nor = mcc.nor)
+  
+  P = ggplot(df, aes(x=F1, y=MCC.nor, ymin=0, ymax=1, xmin=0, xmax=1 )) + geom_point(size = 0.2, shape = 21, fill="white")+
+    theme(plot.title=element_text(hjust=0.5))+
+    coord_equal(ratio=1)+
+    labs(x = "F1 score", y = "normalized MCC", title = .title)
+  
+  # xlab(expression(F[1]*" score"))
+  
+  if (plotCurve){
     
-    ggplot(df, aes(x=F1, y=MCC.nor, ymin=0, ymax=1, xmin=0, xmax=1 )) + geom_point(size = 0.2, shape = 21, fill="white")+
-      theme(plot.title=element_text(hjust=0.5))+
-      coord_equal(ratio=1)+
-      labs(x = "F1 score", y = "normalized MCC", title = title)
+    plot(P)
   }
+  
+  if (!missing(.curveFileName)){
+    pdf(file = .curveFileName)
+    plot(P)
+    dev.off()
+  }
+  
+  
   
   # get rid of NaN values
   mcc.nor_truncated <- mcc.nor[2: (length(mcc.nor)-1)]
@@ -58,7 +72,7 @@ mccf1_feature <- function(real, predicted,fold=100,graph=T,title="the MCC-F1 sco
   }
   
   total_sum <- sum(sums,na.rm=T)
-  measure <- 1 - (total_sum/length(sums))/sqrt(2)
+  metric <- 1 - (total_sum/length(sums))/sqrt(2)
   
   # find the best(top) threshold (closest to (1,1))
   distance = c()
@@ -66,9 +80,15 @@ mccf1_feature <- function(real, predicted,fold=100,graph=T,title="the MCC-F1 sco
     distance <- c(distance, sqrt((1-mcc.nor[i])^2 + (1-f[i])^2))
   }
   
-  cut <- thresholds[match(min(distance, na.rm = T), distance)]
+  bestthreshold <- thresholds[match(min(distance, na.rm = T), distance)]
   
   # output of the function is the MCC-F1 metric and the top threshold
-  result <- list(measure=measure, cut=cut)
-  result
+  result <- list(metric=metric, bestthreshold=bestthreshold)
+  return(result)
 }
+
+############################### TO REMOVE
+
+
+mccf1_feature(real_value_a,predicted_value_A)
+
