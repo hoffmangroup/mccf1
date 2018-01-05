@@ -1,36 +1,26 @@
-# README #
+# MCCF1_curve #
 
-This README would normally document whatever steps are necessary to get your application up and running.
+MCCF1_curve: a method to evaluate the performance of binary classification models
 
-### What is this repository for? ###
-
-* Quick summary
+## Summary ##
 
 The MCC-F1Measure reads an input dataset of real values and prediction values of binary classification, and outputs the corresponding MCC-F1 metric and the best threshold of this prediction.
 
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+## Installation ##
 
-### How do I get set up? ###
-
-* Summary of set up
-* Configuration
-* Dependencies
+To run MCCF1_curve, you need to have the following programs and packages installed in your machine:
 
 R (version 3.3.3)
-R packages ROCR
+R **ROCR** package
+R **ggplot2** package
 
-* Database configuration
-* How to run tests
-* Deployment instructions
+# install MCC-F1_curve??
 
-### Contribution guidelines ###
+## Execution instructions ##
 
-* Writing tests
-* Code review
-* Other guidelines
+# examples
 
-### Who do I talk to? ###
+## Contacts ##
 
 * Repo owner or admin
 * Other community or team contact

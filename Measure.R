@@ -1,15 +1,17 @@
 library(ROCR)
 library(ggplot2)
 
-mccf1_feature <- function(actualvector, predictedvector,fold=100,plotCurve=T,.title="the MCC-F1 score curve",.curveFileName){
-  # actualvector is a vector of actual values in binary classification
-  # predictedvector is a vector of predicted values in binary classification
+mccf1_curve <- function(actualVector, predictedVector, fold=100, plotCurve=T, .title="the MCC-F1 score curve",
+                        .curveFileName){
+  # actualVector is a vector of actual values in binary classification
+  # predictedVector is a vector of predicted values in binary classification
   # fold is the number that will be used to divide the range of normalized Matthews Correlation Coefficient
   # plotCurve is whether or not the MCC-F1 curve will be plotted.
-  # title is the title of the curve
-  # curveFileName is the location and name of the curve if the user wants to save the curve automatically
+  # title is the title of the plot of the MCC-F1 curve
+  # if the user wants to save the pdf file of the graph of the MCC-F1 curve automatically, 
+  # curveFileName is the location and name of the curve 
   
-  pred <- prediction(predictedvector, actualvector)
+  pred <- prediction(predictedVector, actualVector)
   perf <- performance(pred, measure = "tpr", x.measure = "fpr")
   
   perf <- performance(pred, measure = "mat", x.measure = "f")
@@ -18,13 +20,13 @@ mccf1_feature <- function(actualvector, predictedvector,fold=100,plotCurve=T,.ti
   # get normalised MCC: change the range of MCC from [-1, 1] to [0, 1]
   mcc.nor <- (mcc + 1)/2
   # get F1 score
-  f <- attr(perf, "x.values")[[1]]   
+  f1 <- attr(perf, "x.values")[[1]]   
   # get the thresholds
   thresholds <- attr(perf, "alpha.values")[[1]]
   
-  df <- data.frame(F1 = f, MCC.nor = mcc.nor)
+  df <- data.frame(F1 = f1, MCC.nor = mcc.nor)
   
-  P = ggplot(df, aes(x=F1, y=MCC.nor, ymin=0, ymax=1, xmin=0, xmax=1 )) + geom_point(size = 0.2, shape = 21, fill="white")+
+  plot = ggplot(df, aes(x=F1, y=MCC.nor, ymin=0, ymax=1, xmin=0, xmax=1 )) + geom_point(size = 0.2, shape = 21, fill="white")+
     theme(plot.title=element_text(hjust=0.5))+
     coord_equal(ratio=1)+
     labs(x = "F1 score", y = "normalized MCC", title = .title)
@@ -33,12 +35,12 @@ mccf1_feature <- function(actualvector, predictedvector,fold=100,plotCurve=T,.ti
   
   if (plotCurve){
     
-    plot(P)
+    plot(plot)
   }
   
   if (!missing(.curveFileName)){
     pdf(file = .curveFileName)
-    plot(P)
+    plot(plot)
     dev.off()
   }
   
@@ -46,7 +48,7 @@ mccf1_feature <- function(actualvector, predictedvector,fold=100,plotCurve=T,.ti
   
   # get rid of NaN values
   mcc.nor_truncated <- mcc.nor[2: (length(mcc.nor)-1)]
-  f_truncated <- f[2: (length(f)-1)]
+  f_truncated <- f1[2: (length(f1)-1)]
   
   # calculate mcc_f1 metric
   
@@ -62,17 +64,17 @@ mccf1_feature <- function(actualvector, predictedvector,fold=100,plotCurve=T,.ti
         pos <- c(pos, m)
       }
     }
-    sum <- 0
+    sum_of_distance <- 0
     for (j in pos){
       d <- sqrt((mcc.nor_truncated[j]-1)^2 + (f_truncated[j]-1)^2)
-      sum <- sum + d
+      sum_of_distance <- sum_of_distance + d
     }
     
     sums <- c(sums, sum/length(pos))
   }
   
-  total_sum <- sum(sums,na.rm=T)
-  metric <- 1 - (total_sum/length(sums))/sqrt(2)
+  sums_no_na <- sum(sums,na.rm=T)
+  metric <- 1 - (sums_no_na/length(sums))/sqrt(2)
   
   # find the best(top) threshold (closest to (1,1))
   distance = c()
