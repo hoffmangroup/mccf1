@@ -26,11 +26,11 @@ First, run our package MCC-F1_curve.
 
 Then you can use the function mccf1_calcu the corresponding MCC-F1 metric and the best threshold of the prediction, or the function mccf1_plot to plot the MCC-F1 curve.
 
-`result <- mccf1_calcu(actualVector, predictedVector)
-`result$metric
-`result$bestthreshold
+`result <- mccf1_calcu(actualVector, predictedVector);
+`result$metric;
+`result$bestthreshold;
 
-mccf1_plot(actualVector, predictedVector)
+`mccf1_plot(actualVector, predictedVector)
 
 ## Contacts ##
 
