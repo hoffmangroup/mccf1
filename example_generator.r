@@ -12,7 +12,7 @@ result$metric
 # change the fold when calculating MCC-F1 metric
 mccf1_calcu(actual, predicted, fold = 50)
 
-# function call to generate and plot the MCC F1 score curve.
+# function call to generate and plot the MCC-F1 score curve.
 # use mccf1_plot to plot the corresponding MCC-F1 curve 
 mccf1_plot(actual, predicted, .title="the MCC-F1 score curve (example)")
 # save the pdf file of the image to a specified folder 

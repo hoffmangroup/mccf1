@@ -39,7 +39,9 @@ Then you can use the function mccf1_calcu the corresponding MCC-F1 metric and th
 
 	mccf1_plot(actualVector, predictedVector)
 
+A more detailed example is in the file "example_generator.r".
+
 ## Contacts ##
 
-The MCCF1_curve package was developed by Chang Cao, Davide Chicco, and Michael M. Hoffman at the Hoffman Lab of the Princess Margaret Cancer Centre (Toronto, Ontario, Canada). Questions should be
+The MCC-F1Curve package was developed by Chang Cao, Davide Chicco, and Michael M. Hoffman at the Hoffman Lab of the Princess Margaret Cancer Centre (Toronto, Ontario, Canada). Questions should be
 addressed to Michael M. Hoffman <michael.hoffman@utoronto.ca>.
