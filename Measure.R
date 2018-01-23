@@ -74,7 +74,7 @@ mccf1_calcu <- function(actualVector, predictedVector, fold=100){
   # find the best(top) threshold (closest to (1,1))
   distance = c()
   for (i in (1:length(mcc.nor))){
-    distance <- c(distance, sqrt((1-mcc.nor[i])^2 + (1-f[i])^2))
+    distance <- c(distance, sqrt((1-mcc.nor[i])^2 + (1-f1[i])^2))
   }
   
   bestthreshold <- thresholds[match(min(distance, na.rm = T), distance)]
