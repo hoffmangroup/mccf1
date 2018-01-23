@@ -14,8 +14,8 @@ To run MCC-F1Curve, you need to have the following programs and packages install
 * R **ROCR** package
 * R **ggplot2** package
 
-	install.packages("ROCR")
-	install.packages("ggplot2")
+		install.packages("ROCR")
+		install.packages("ggplot2")
 
 After installing R and the afore-mentioned libraries, clone this MCC-F1Curve repository.
 
