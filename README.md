@@ -42,9 +42,9 @@ Then you can use the function `mccf1_calcu()` to generate the corresponding MCC-
 
 	result <- mccf1_calcu(actual, predicted)
 
-	result$mccf1_metric
+	cat("The MCC F1 score metric is ", result$mccf1_metric," \n");
 
-	result$bestThreshold
+	cat("The best confusion matrix threshold for the MCC F1 score curve is ", result$bestThreshold," \n");
 	
 You can also change the fold when calculating MCC-F1 metric.
 	
