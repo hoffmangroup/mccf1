@@ -25,21 +25,34 @@ After installing R and the afore-mentioned libraries, clone this MCC-F1Curve rep
 
 # An example
 
-Suppose you are evaluating a binary classification model. In your test set, you have the actual values and the predicted values. Let's use *actualVector* to represent the vector of actual values and *predictedVector* to represent the vector of predicted values.
+To run MCC-F1Curve, you first need to have a vector of actual values and a vector of predicted values.
+I will use the following code to simulate an example. I will use beta distribution to simulate the predicted value vector.
 
-First, run our package MCC-F1Curve.
+  actual <- c(rep(1, 1000), rep(0, 10000))
+  predicted <- c(rbeta(300, 12, 2), rbeta(700, 3, 4),rbeta(10000, 2, 3))
 
-Then you can use the function mccf1_calcu the corresponding MCC-F1 metric and the best threshold of the prediction, or the function mccf1_plot to plot the MCC-F1 curve.
+Secondly, run our package MCC-F1Curve.
 
-	result <- mccf1_calcu(actualVector, predictedVector)
+Then you can use the function mccf1_calcu the corresponding MCC-F1 metric and the best threshold of the prediction.
+
+	result <- mccf1_calcu(actual, predicted)
 
 	result$metric
 
-	result$bestthreshold
+	result$bestThreshold
+	
+You can change the fold when calculating MCC-F1 metric.
+	
+  mccf1_calcu(actual, predicted, fold = 50)
+  
+You can also use mccf1_plot to plot the corresponding MCC-F1 curve 
 
-	mccf1_plot(actualVector, predictedVector)
+	mccf1_plot(actual, predicted, .title="the MCC-F1 score curve (example)")
 
-A more detailed example is in the file "example_generator.r".
+You can save the pdf file of the image to a specified folder 
+
+  mccf1_plot(actual, predicted, .title="the MCC-F1 score curve (example)", 
+           .curveFileName="/users/ccao/Pictures")
 
 ## Contacts ##
 
