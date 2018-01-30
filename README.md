@@ -4,7 +4,7 @@ MCC-F1Curve: a method to evaluate the performance of binary classification model
 
 ## Summary ##
 
-The MCC-F1Curve reads an input dataset of real values and prediction values of binary classification, and outputs the corresponding MCC-F1 metric and the best threshold of this prediction. It can also plot the MCC-F1 curve.
+The MCC-F1Curve reads an input dataset of real values and prediction values of binary classification, and outputs the \\ corresponding MCC-F1 metric and the best threshold of this prediction. It can also plot the MCC-F1 curve.
 
 ## Installation ##
 
@@ -25,11 +25,11 @@ After installing R and the afore-mentioned libraries, clone this MCC-F1Curve rep
 
 # An example
 
-To run MCC-F1Curve, you first need to have a vector of actual values and a vector of predicted values.
+To run MCC-F1Curve, you first need to have a vector of actual values and a vector of predicted values. \\
 I will use the following code to simulate an example. I will use beta distribution to simulate the predicted value vector.
 
-  actual <- c(rep(1, 1000), rep(0, 10000))
-  predicted <- c(rbeta(300, 12, 2), rbeta(700, 3, 4),rbeta(10000, 2, 3))
+    actual <- c(rep(1, 1000), rep(0, 10000))
+    predicted <- c(rbeta(300, 12, 2), rbeta(700, 3, 4),rbeta(10000, 2, 3))
 
 Secondly, run our package MCC-F1Curve.
 
