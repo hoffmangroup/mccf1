@@ -56,7 +56,9 @@ You can also use `mccf1_plot()` to plot the corresponding MCC-F1 curve.
 
 You can save the pdf file of the image to a specified folder. 
 
-    mccf1_plot(actual, predicted, .title="the MCC-F1 score curve (example)", .curveFileName="/users/ccao/Pictures/mcc-f1_example")
+    pdfFileName = "./curve.pdf" 
+
+    mccf1_plot(actual, predicted, .title="the MCC-F1 score curve (example)", .curveFileName=pdfFileName)
 
 ## Contacts ##
 
