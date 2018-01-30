@@ -43,16 +43,15 @@ Then you can use the function mccf1_calcu the corresponding MCC-F1 metric and th
 	
 You can change the fold when calculating MCC-F1 metric.
 	
-  mccf1_calcu(actual, predicted, fold = 50)
+    mccf1_calcu(actual, predicted, fold = 50)
   
-You can also use mccf1_plot to plot the corresponding MCC-F1 curve 
+You can also use mccf1_plot to plot the corresponding MCC-F1 curve. 
 
 	mccf1_plot(actual, predicted, .title="the MCC-F1 score curve (example)")
 
-You can save the pdf file of the image to a specified folder 
+You can save the pdf file of the image to a specified folder. 
 
-  mccf1_plot(actual, predicted, .title="the MCC-F1 score curve (example)", 
-           .curveFileName="/users/ccao/Pictures")
+  mccf1_plot(actual, predicted, .title="the MCC-F1 score curve (example)", .curveFileName="/users/ccao/Pictures")
 
 ## Contacts ##
 
