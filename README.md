@@ -4,7 +4,7 @@ MCC-F1Curve: a method to evaluate the performance of binary classification model
 
 ## Summary ##
 
-The MCC-F1Curve reads an input dataset of real values and prediction values of binary classification, and outputs the corresponding MCC-F1 metric and the best threshold of this prediction. It can also plot the MCC-F1 curve.
+The MCC-F1Curve reads an input dataset of real values and prediction values of binary classification, and outputs the corresponding MCC-F1 score metric and the best confusion matrix threshold of the prediction. It can also plot the MCC-F1 score curve.
 
 ## Installation ##
 
@@ -23,18 +23,22 @@ After installing R and the afore-mentioned libraries, clone this MCC-F1Curve rep
 
 ## Execution instructions ##
 
+Allocate your ground-truth real values into an array, and your predicted real values into another one. Then call the `mccf1_calcu()` function to compute the MCC-F1 score metric and the best thresold, or the `mccf1_plot()` to plot and save the MCC-F1 score curve. See the example below.
+
 # An example
 
 To run MCC-F1Curve, you first need to have a vector of actual values and a vector of predicted values.
 
-I will use the following code to simulate an example. I will use beta distribution to simulate the predicted value vector.
+We use beta distribution to simulate the predicted value vector. From the R terminal, type:
 
     actual <- c(rep(1, 1000), rep(0, 10000))
     predicted <- c(rbeta(300, 12, 2), rbeta(700, 3, 4),rbeta(10000, 2, 3))
 
-Secondly, run our code file MCC-F1Curve.R.
+Secondly, include the code file MCC-F1Curve.R.
 
-Then you can use the function mccf1_calcu the corresponding MCC-F1 metric and the best threshold of the prediction.
+    source("MCC-F1Curve.R")
+
+Then you can use the function `mccf1_calcu()` to generate the corresponding MCC-F1 score metric and the best threshold of the prediction:
 
 	result <- mccf1_calcu(actual, predicted)
 
@@ -42,11 +46,11 @@ Then you can use the function mccf1_calcu the corresponding MCC-F1 metric and th
 
 	result$bestThreshold
 	
-You can change the fold when calculating MCC-F1 metric.
+You can also change the fold when calculating MCC-F1 metric.
 	
-    mccf1_calcu(actual, predicted, fold = 50)
+	mccf1_calcu(actual, predicted, fold = 50)
   
-You can also use mccf1_plot to plot the corresponding MCC-F1 curve. 
+You can also use `mccf1_plot()` to plot the corresponding MCC-F1 curve. 
 
 	mccf1_plot(actual, predicted, .title="the MCC-F1 score curve (example)")
 
@@ -56,5 +60,5 @@ You can save the pdf file of the image to a specified folder.
 
 ## Contacts ##
 
-The MCC-F1Curve package was developed by Chang Cao, Davide Chicco, and Michael M. Hoffman at the Hoffman Lab of the Princess Margaret Cancer Centre (Toronto, Ontario, Canada). Questions should be
+The MCC-F1Curve package was developed by Chang Cao, Davide Chicco, and Michael M. Hoffman at the [Hoffman Lab](http://www.hoffmanlab.org) of the [Princess Margaret Cancer Centre](http://www.uhn.ca/PrincessMargaret/Research) (Toronto, Ontario, Canada). Questions should be
 addressed to Michael M. Hoffman <michael.hoffman@utoronto.ca>.
