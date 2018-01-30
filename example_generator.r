@@ -7,8 +7,8 @@ predicted <- c(rbeta(300, 12, 2), rbeta(700, 3, 4),rbeta(10000, 2, 3))
 # function call to get the best threshold and MCC-F1 metric
 # use mccf1_calcu function to calculate best threshold and MCC-F1 metric
 result <- mccf1_calcu(actual, predicted)
-result$bestthreshold
-result$metric
+result$bestThreshold
+result$mccf1_metric
 # change the fold when calculating MCC-F1 metric
 mccf1_calcu(actual, predicted, fold = 50)
 
@@ -17,5 +17,6 @@ mccf1_calcu(actual, predicted, fold = 50)
 mccf1_plot(actual, predicted, .title="the MCC-F1 score curve (example)")
 # save the pdf file of the image to a specified folder 
 mccf1_plot(actual, predicted, .title="the MCC-F1 score curve (example)", 
-           .curveFileName="/users/ccao/Pictures")
+           .curveFileName="/users/ccao/Pictures/mcc-f1_example")
+
 
