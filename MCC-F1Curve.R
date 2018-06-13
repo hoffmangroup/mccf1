@@ -69,23 +69,23 @@ mccf1_calcu <- function(actualVector, predictedVector, fold=100) {
   mcc.nor_truncated <- mcc.nor[2: (length(mcc.nor) - 1)]
   f_truncated <- f1[2: (length(f1) - 1)]
   
-  # get the index of the point with largest MCC ("point" refers to the point on the MCC-F1 curve)
+  # get the index of the point with largest normalized MCC ("point" refers to the point on the MCC-F1 curve)
   index_of_max_mcc <- which.max(mcc.nor_truncated)
-  # define points on the MCC-F1 curve located on the left of the point with the highest MCC as "left curve"
-  # get the left curve by getting the subvectors of MCC and F1 up to the index of the largest MCC 
+  # define points on the MCC-F1 curve located on the left of the point with the highest normalized MCC as "left curve"
+  # get the left curve by getting the subvectors of MCC and F1 up to the index of the largest normalized MCC 
   mcc_left <- mcc.nor_truncated[1: index_of_max_mcc]
   f_left <- f_truncated[1: index_of_max_mcc]
-  # define points on the MCC-F1 curve located on the right of the point with the highest MCC as "right curve"
-  # get the right curve by getting the subvectors of MCC and F1 after the index of the largest MCC
+  # define points on the MCC-F1 curve located on the right of the point with the highest normalized MCC as "right curve"
+  # get the right curve by getting the subvectors of MCC and F1 after the index of the largest normalized MCC
   mcc_right <- mcc.nor_truncated[(index_of_max_mcc + 1): length(mcc.nor_truncated)]
   f_right <- f_truncated[(index_of_max_mcc + 1): length(f_truncated)]
   
-  # divide the range of MCC into subranges
+  # divide the range of normalized MCC into subranges
   unit_len <- (max(mcc.nor_truncated) - min(mcc.nor_truncated)) / fold
   # calculate the sum of mean distances from the left curve to the point (1, 1)
   mean_distances_left <- 0
   for (i in 1: fold){
-    # find all the points with MCC between unit_len*(i-1) and unit_len*i
+    # find all the points on the left curve with normalized MCC between unit_len*(i-1) and unit_len*i
     pos1 <- which(mcc_left >= min(mcc.nor_truncated) + (i-1) * unit_len)
     pos2 <- which(mcc_left <= min(mcc.nor_truncated) + i * unit_len)
     pos <- c()
@@ -106,10 +106,10 @@ mccf1_calcu <- function(actualVector, predictedVector, fold=100) {
   num_of_na_left <- sum(is.na(mean_distances_left))
   sum_of_mean_distances_left_no_na <- sum(mean_distances_left, na.rm = T)
   
-  
+  # calculate the sum of mean distances from the right curve to the point (1, 1)
   mean_distances_right <- 0
   for (i in 1: fold){
-    # find all the points with mcc between c and c*i
+    # find all the points on the right curve with normalized MCC between unit_len*(i-1) and unit_len*i
     pos1 <- which(mcc_right >= min(mcc.nor_truncated) + (i-1) * unit_len)
     pos2 <- which(mcc_right <= min(mcc.nor_truncated) + i * unit_len)
     pos <- c()
@@ -136,7 +136,7 @@ mccf1_calcu <- function(actualVector, predictedVector, fold=100) {
 
   # find the best threshold 
   eu_distance = c()
-  for (i in (1:length(mcc.nor))){
+  for (i in (1: length(mcc.nor))){
     eu_distance <- c(eu_distance, sqrt((1 - mcc.nor[i])^2 + (1 - f1[i])^2))
   }
   
