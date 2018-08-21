@@ -1,14 +1,16 @@
-# MCC-F1Curve #
+# mccf1 #
 
-MCC-F1Curve: a method to evaluate the performance of binary classification models
+mccf1: a method to evaluate the performance of binary classification models
 
 ## Summary ##
 
-The MCC-F1Curve reads an input dataset of real values and prediction values of binary classification, and outputs the corresponding MCC-F1 score metric and the best confusion matrix threshold of the prediction. It can also plot the MCC-F1 score curve.
+The mccf1 reads an input dataset of real values and prediction values of binary classification, and outputs the corresponding MCC-F1 score metric and the best confusion matrix threshold of the prediction. It can also plot the MCC-F1 score curve.
 
 ## Installation ##
 
-To run MCC-F1Curve, you need to have the following programs and packages installed in your machine:
+The mccf1 package is now available on CRAN: [https://cran.r-project.org/package=mccf1](https://cran.r-project.org/package=mccf1)
+
+To run mccf1, you need to have the following programs and packages installed in your machine:
 
 * R (version 3.3.3)
 * R **ROCR** package
@@ -19,7 +21,8 @@ To run MCC-F1Curve, you need to have the following programs and packages install
 
 		install.packages("ggplot2")
 
-After installing R and the afore-mentioned libraries, clone this MCC-F1Curve repository.
+After installing R, you can install the mccf1 package by typing in the R terminal:
+`install.packages("mccf1")`
 
 ## Execution instructions ##
 
@@ -27,7 +30,7 @@ Allocate your ground-truth real values into an array, and your predicted real va
 
 # An example
 
-To run MCC-F1Curve, you first need to have a vector of actual values and a vector of predicted values.
+To run mccf1, you first need to have a vector of actual values and a vector of predicted values.
 
 We use beta distribution to simulate the predicted value vector. From the R terminal, type:
 
@@ -48,9 +51,9 @@ We use beta distribution to simulate the predicted value vector. From the R term
                   shape2_pos_type_1), rbeta(proportion_of_predicted_for_pos_type_2 * num_of_positive_class, 
                   shape1_pos_type_2, shape2_pos_type_2), rbeta(num_of_negative_class, shape1_neg, shape2_neg))
 
-Secondly, include the code file MCC-F1Curve.R.
+Secondly, include the code file mccf1.R.
 
-    source("MCC-F1Curve.R")
+    source("mccf1.R")
 
 Then you can use the function `mccf1_calcu()` to generate the corresponding MCC-F1 score metric and the best threshold of the prediction:
 
@@ -76,5 +79,5 @@ You can save the pdf file of the image to a specified folder.
 
 ## Contacts ##
 
-The MCC-F1Curve package was developed by Chang Cao, Davide Chicco, and Michael M. Hoffman at the [Hoffman Lab](http://www.hoffmanlab.org) of the [Princess Margaret Cancer Centre](http://www.uhn.ca/PrincessMargaret/Research) (Toronto, Ontario, Canada). Questions should be
+The mccf1 package was developed by Chang Cao, Davide Chicco, and Michael M. Hoffman at the [Hoffman Lab](http://www.hoffmanlab.org) of the [Princess Margaret Cancer Centre](http://www.uhn.ca/PrincessMargaret/Research) (Toronto, Ontario, Canada). Questions should be
 addressed to Michael M. Hoffman <michael.hoffman@utoronto.ca>.
